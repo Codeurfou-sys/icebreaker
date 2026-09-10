@@ -362,7 +362,7 @@
     </div>
   </div>
 
-  <p class="footer-note">Cet outil utilise un petit service de stockage externe gratuit (jsonblob.com) pour synchroniser la partie entre les participants — aucune inscription, aucune donnée personnelle autre que le prénom que vous tapez. Photos : Wikimedia Commons, domaine public / licence libre.</p>
+  <p class="footer-note">Cet outil utilise un petit service de stockage externe gratuit (jsonstorage.net) pour synchroniser la partie entre les participants — aucune inscription, aucune donnée personnelle autre que le prénom que vous tapez. Photos : Wikimedia Commons, domaine public / licence libre.</p>
 </div>
 
 <script>
@@ -382,7 +382,7 @@ const ROUNDS = [
 ROUNDS.forEach(r => { r.url = FP + encodeURIComponent(r.file).replace(/%2C/g,",") + "?width=500"; });
 
 const STAGES = [46, 26, 14, 7, 1]; // block sizes, last = fully clear
-const JSONBLOB_BASE = "https://jsonblob.com/api/jsonBlob";
+const JSONSTORAGE_BASE = "https://api.jsonstorage.net/v1/json";
 
 let role = null;
 let playerName = "";
@@ -474,37 +474,33 @@ function drawPixelated(canvas, roundIdx, blockSize){
   ctx.drawImage(tiny, 0, 0, tw, tw, 0, 0, size, size);
 }
 
-// ---------- jsonblob.com storage helpers ----------
-// Everything lives in ONE JSON blob: { state: {...}, buzzes: { "0": [...], "1": [...] } }
+// ---------- jsonstorage.net storage helpers ----------
+// Everything lives in ONE JSON resource: { state: {...}, buzzes: { "0": [...], "1": [...] } }
+// BUCKET holds the full resource URI returned by jsonstorage.net at creation time.
 async function createBucket(){
   const initial = { state: { round: 0, stage: 0, showAnswer: false }, buzzes: {} };
-  const res = await fetch(JSONBLOB_BASE, {
+  const res = await fetch(JSONSTORAGE_BASE, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Accept": "application/json" },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(initial)
   });
   if(!res.ok) throw new Error("Le service de stockage n'a pas pu créer la partie (code " + res.status + ").");
-  const loc = res.headers.get("Location");
-  if(!loc) throw new Error("Le service de stockage n'a pas renvoyé d'identifiant de partie.");
-  const id = loc.split("/").filter(Boolean).pop();
-  if(!id) throw new Error("Identifiant de partie invalide reçu du service de stockage.");
-  return id;
+  const data = await res.json();
+  if(!data || !data.uri) throw new Error("Le service de stockage n'a pas renvoyé d'adresse de partie.");
+  return data.uri;
 }
 
 async function getBlob(){
-  const res = await fetch(`${JSONBLOB_BASE}/${BUCKET}`, {
-    headers: { "Accept": "application/json" },
-    cache: "no-store"
-  });
+  const res = await fetch(BUCKET, { cache: "no-store" });
   if(res.status === 404) throw new Error("Cette partie n'existe plus ou le lien est incorrect.");
   if(!res.ok) throw new Error("Lecture impossible (code " + res.status + ").");
   return await res.json();
 }
 
 async function putBlob(data){
-  const res = await fetch(`${JSONBLOB_BASE}/${BUCKET}`, {
+  const res = await fetch(BUCKET, {
     method: "PUT",
-    headers: { "Content-Type": "application/json", "Accept": "application/json" },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data)
   });
   if(!res.ok) throw new Error("Écriture impossible (code " + res.status + ").");
@@ -624,7 +620,7 @@ $("pick-host").addEventListener("click", async () => {
     showScreen("screen-game");
     startPolling();
   }catch(e){
-    showError("Impossible de démarrer la partie : " + e.message + " — vérifiez votre connexion, ou que jsonblob.com n'est pas bloqué par un pare-feu/proxy, puis réessayez.");
+    showError("Impossible de démarrer la partie : " + e.message + " — vérifiez votre connexion, ou que jsonstorage.net n'est pas bloqué par un pare-feu/proxy, puis réessayez.");
     btn.classList.remove("disabled");
     $("host-btn-label").textContent = "Je suis l'animateur·rice";
   }
