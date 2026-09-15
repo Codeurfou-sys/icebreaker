@@ -428,81 +428,89 @@
 
 const FP = "https://commons.wikimedia.org/wiki/Special:FilePath/";
 function roundUrl(r){
-  return r.dataUri || r.url || (FP + encodeURIComponent(r.file).replace(/%2C/g,",") + "?width=500");
+  if (r.dataUri) return r.dataUri;
+  if (r.url) return r.url;
+  // Si r.file est déjà une URL complète (pour GitHub Pages)
+  if (r.file && r.file.startsWith('http')) return r.file;
+  // Sinon, utiliser l'ancien mécanisme avec FP (pour Wikimedia Commons)
+  return FP + encodeURIComponent(r.file).replace(/%2C/g,",") + "?width=500";
 }
 
 const STAGES = [46, 26, 14, 7, 1];
 
 // ============================================
 // ROUNDS - Tableau complet avec 10 images
+// Utilise les URLs GitHub pour fonctionner sur GitHub Pages
 // ============================================
+
+const GITHUB_REPO = "https://raw.githubusercontent.com/CodeurFou-sys/Brise-glace/main/";
 
 const ROUNDS = [
   {
-    file: "International_Symbol_of_Access.svg",
+    file: GITHUB_REPO + "accessibility-icon.877x0-is.jpg",
     answer: "Le symbole international du handicap",
     tie: "Créé en 1968 par Susanne Koefoed, une étudiante danoise en design — pourtant, aujourd'hui, 80% des handicaps sont en réalité invisibles.",
     credit: "Wikimedia Commons, domaine public",
-    keywords: ["symbole handicap", "panneau handicap", "pictogramme handicap", "logo handicap", "picto handicap", "handicap", "fauteuil roulant symbole"]
+    keywords: ["symbole handicap", "panneau handicap", "pictogramme handicap", "logo handicap", "picto handicap", "handicap", "fauteuil roulant symbole", "symbole accessibilité"]
   },
   {
-    file: "Canne blanche.jpg",
+    file: GITHUB_REPO + "Canne%20blanche.jpg",
     answer: "Canne blanche",
     tie: "Outil d'autonomie essentiel pour les personnes malvoyantes ou aveugles.",
     credit: "Photo libre de droits",
     keywords: ["canne", "canne blanche", "canne pour aveugle", "canne pour malvoyant"]
   },
   {
-    file: "Deficients-visuels-CMJN.webp",
+    file: GITHUB_REPO + "D%C3%A9ficients%20visuels-CMJN.webp.webp",
     answer: "Symbole déficience visuelle",
     tie: "Ce pictogramme représente les troubles de la vision et l'accessibilité pour les personnes malvoyantes.",
     credit: "Wikimedia Commons",
     keywords: ["symbole déficience visuelle", "déficience visuelle", "pictogramme aveugle", "pictogramme malvoyant", "symbole malvoyant"]
   },
   {
-    file: "fauteuil roulant.jpg",
+    file: GITHUB_REPO + "fauteuil%20roulant.jpg",
     answer: "Fauteuil roulant",
     tie: "Équipement de mobilité pour les personnes à mobilité réduite.",
     credit: "Photo libre de droits",
     keywords: ["fauteuil roulant", "fauteuil", "chaise roulante"]
   },
   {
-    file: "Deficients-auditifs-CMJN-10x10-cm.webp",
+    file: GITHUB_REPO + "D%C3%A9ficients-auditifs-CMJN-10x10-cm.webp.webp",
     answer: "Déficience auditive",
     tie: "Ce symbole représente les troubles de l'audition et l'accessibilité pour les personnes sourdes ou malentendantes.",
     credit: "Wikimedia Commons",
     keywords: ["déficience auditive", "pictogramme surdité", "symbole mal entendant", "mal entendant", "sourd", "symbole sourd", "problème auditif"]
   },
   {
-    file: "handicap-psychique-cognitif-min.jpg",
+    file: GITHUB_REPO + "handicap-psychique-cognitif-min.jpg",
     answer: "Symbole déficience psychique",
     tie: "Représente les troubles psychiques et cognitifs, souvent invisibles mais bien réels.",
     credit: "Photo libre de droits",
     keywords: ["symbole déficience psychique", "pictogramme déficience psychique", "pictogramme maladie mentale", "pictogramme problèmes psychiques", "troubles psychiques", "handicap psychique"]
   },
   {
-    file: "17-300x264.jpg",
+    file: GITHUB_REPO + "17-300x264.jpg",
     answer: "Handicap mental",
     tie: "Ce pictogramme symbolise les handicaps intellectuels et les troubles cognitifs.",
     credit: "Photo libre de droits",
     keywords: ["pictogramme handicap mental", "handicap mental", "handicaps mentaux", "déficience intellectuelle"]
   },
   {
-    file: "image-2.png",
+    file: GITHUB_REPO + "place-de-parking-PMR.jpg",
     answer: "Place de parking handicapé",
     tie: "Espace réservé pour faciliter l'accès des personnes à mobilité réduite.",
     credit: "Photo libre de droits",
-    keywords: ["place de parking handicapé", "place handicapé", "une place handicapé", "parking handicap", "stationnement handicapé"]
+    keywords: ["place de parking handicapé", "place handicapé", "une place handicapé", "parking handicap", "stationnement handicapé", "parking PMR"]
   },
   {
-    file: "LOGO_AD-300x150.png",
+    file: GITHUB_REPO + "LOGO_AD-300x150.png",
     answer: "Logo audio description",
     tie: "Symbole de l'audiodescription, service qui rend les films et spectacles accessibles aux personnes aveugles ou malvoyantes.",
     credit: "Logo officiel",
     keywords: ["logo audio description", "audio description", "symbole audiodescription", "audiodescription", "AD"]
   },
   {
-    file: "braille bon.png",
+    file: GITHUB_REPO + "braille%20bon.png",
     answer: "Braille",
     tie: "Système d'écriture tactile à points saillants, inventé par Louis Braille en 1829.",
     credit: "Image libre de droits",
