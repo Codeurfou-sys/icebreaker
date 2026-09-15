@@ -430,9 +430,7 @@ const FP = "https://commons.wikimedia.org/wiki/Special:FilePath/";
 function roundUrl(r){
   if (r.dataUri) return r.dataUri;
   if (r.url) return r.url;
-  // Si r.file est déjà une URL complète (pour GitHub Pages)
   if (r.file && r.file.startsWith('http')) return r.file;
-  // Sinon, utiliser l'ancien mécanisme avec FP (pour Wikimedia Commons)
   return FP + encodeURIComponent(r.file).replace(/%2C/g,",") + "?width=500";
 }
 
@@ -440,77 +438,77 @@ const STAGES = [46, 26, 14, 7, 1];
 
 // ============================================
 // ROUNDS - Tableau complet avec 10 images
-// Utilise les URLs GitHub pour fonctionner sur GitHub Pages
+// Utilise les URLs directes vers ton dépôt GitHub
 // ============================================
 
-const GITHUB_REPO = "https://raw.githubusercontent.com/CodeurFou-sys/Brise-glace/main/";
+const GITHUB_BASE = "https://codeurfou-sys.github.io/icebreaker/";
 
 const ROUNDS = [
   {
-    file: GITHUB_REPO + "accessibility-icon.877x0-is.jpg",
+    file: "https://upload.wikimedia.org/wikipedia/commons/7/77/International_Symbol_of_Access.svg",
     answer: "Le symbole international du handicap",
     tie: "Créé en 1968 par Susanne Koefoed, une étudiante danoise en design — pourtant, aujourd'hui, 80% des handicaps sont en réalité invisibles.",
     credit: "Wikimedia Commons, domaine public",
     keywords: ["symbole handicap", "panneau handicap", "pictogramme handicap", "logo handicap", "picto handicap", "handicap", "fauteuil roulant symbole", "symbole accessibilité"]
   },
   {
-    file: GITHUB_REPO + "Canne blanche.jpg",
+    file: GITHUB_BASE + "Canne%20blanche.jpg",
     answer: "Canne blanche",
     tie: "Outil d'autonomie essentiel pour les personnes malvoyantes ou aveugles.",
     credit: "Photo libre de droits",
     keywords: ["canne", "canne blanche", "canne pour aveugle", "canne pour malvoyant"]
   },
   {
-    file: GITHUB_REPO + "D%C3%A9ficients%20visuels-CMJN.webp.webp",
+    file: GITHUB_BASE + "D%C3%A9ficients%20visuels-CMJN.webp.webp",
     answer: "Symbole déficience visuelle",
     tie: "Ce pictogramme représente les troubles de la vision et l'accessibilité pour les personnes malvoyantes.",
     credit: "Wikimedia Commons",
     keywords: ["symbole déficience visuelle", "déficience visuelle", "pictogramme aveugle", "pictogramme malvoyant", "symbole malvoyant"]
   },
   {
-    file: GITHUB_REPO + "fauteuil%20roulant.jpg",
+    file: GITHUB_BASE + "fauteuil%20roulant.jpg",
     answer: "Fauteuil roulant",
     tie: "Équipement de mobilité pour les personnes à mobilité réduite.",
     credit: "Photo libre de droits",
     keywords: ["fauteuil roulant", "fauteuil", "chaise roulante"]
   },
   {
-    file: GITHUB_REPO + "D%C3%A9ficients-auditifs-CMJN-10x10-cm.webp.webp",
+    file: GITHUB_BASE + "D%C3%A9ficients-auditifs-CMJN-10x10-cm.webp.webp",
     answer: "Déficience auditive",
     tie: "Ce symbole représente les troubles de l'audition et l'accessibilité pour les personnes sourdes ou malentendantes.",
     credit: "Wikimedia Commons",
     keywords: ["déficience auditive", "pictogramme surdité", "symbole mal entendant", "mal entendant", "sourd", "symbole sourd", "problème auditif"]
   },
   {
-    file: GITHUB_REPO + "handicap-psychique-cognitif-min.jpg",
+    file: GITHUB_BASE + "handicap-psychique-cognitif-min.jpg",
     answer: "Symbole déficience psychique",
     tie: "Représente les troubles psychiques et cognitifs, souvent invisibles mais bien réels.",
     credit: "Photo libre de droits",
     keywords: ["symbole déficience psychique", "pictogramme déficience psychique", "pictogramme maladie mentale", "pictogramme problèmes psychiques", "troubles psychiques", "handicap psychique"]
   },
   {
-    file: GITHUB_REPO + "17-300x264.jpg",
+    file: GITHUB_BASE + "17-300x264.jpg",
     answer: "Handicap mental",
     tie: "Ce pictogramme symbolise les handicaps intellectuels et les troubles cognitifs.",
     credit: "Photo libre de droits",
     keywords: ["pictogramme handicap mental", "handicap mental", "handicaps mentaux", "déficience intellectuelle"]
   },
   {
-    file: GITHUB_REPO + "place-de-parking-PMR.jpg",
+    file: GITHUB_BASE + "place-de-parking-PMR.jpg",
     answer: "Place de parking handicapé",
     tie: "Espace réservé pour faciliter l'accès des personnes à mobilité réduite.",
     credit: "Photo libre de droits",
     keywords: ["place de parking handicapé", "place handicapé", "une place handicapé", "parking handicap", "stationnement handicapé", "parking PMR"]
   },
   {
-    file: GITHUB_REPO + "LOGO_AD-300x150.png",
+    file: GITHUB_BASE + "LOGO_AD-300x150.png",
     answer: "Logo audio description",
     tie: "Symbole de l'audiodescription, service qui rend les films et spectacles accessibles aux personnes aveugles ou malvoyantes.",
     credit: "Logo officiel",
     keywords: ["logo audio description", "audio description", "symbole audiodescription", "audiodescription", "AD"]
   },
   {
-    file: GITHUB_REPO + "braille%20bon.png",
+    file: GITHUB_BASE + "braille%20bon.png",
     answer: "Braille",
     tie: "Système d'écriture tactile à points saillants, inventé par Louis Braille en 1829.",
     credit: "Image libre de droits",
@@ -805,14 +803,12 @@ function addFeedItem(name, text, isCorrect = false){
   state.feed = state.feed || [];
   state.feed.push({ name, text, timestamp, correct: isCorrect });
   
-  // Garder seulement les 20 derniers éléments
   if(state.feed.length > 20){
     state.feed = state.feed.slice(-20);
   }
   
   updateFeed();
   
-  // Si c'est une bonne réponse, afficher le banner
   if(isCorrect){
     const round = ROUNDS[state.round];
     if(round){
@@ -834,24 +830,19 @@ function handleMessage(msg, conn){
       break;
       
     case "guess":
-      if(state.roundAnswered) break; // Ne pas accepter de nouvelles réponses
+      if(state.roundAnswered) break;
       
       const round = ROUNDS[state.round];
       if(round && isCorrectAnswer(msg.guess, round.keywords)){
-        // Bonne réponse !
         state.roundAnswered = true;
         state.roundAnsweredBy = msg.name;
         
-        // Ajouter au score
         state.scores[msg.name] = (state.scores[msg.name] || 0) + 1;
         
-        // Afficher la réponse
         state.showAnswer = true;
         
-        // Ajouter au feed
         addFeedItem(msg.name, "a trouvé ! 🎉", true);
         
-        // Envoyer à tous que la manche est terminée
         broadcast({
           type: "round_answered",
           name: msg.name,
@@ -859,7 +850,6 @@ function handleMessage(msg, conn){
           answer: round.answer
         });
         
-        // Bloquer les contrôles des joueurs
         if(role === "player"){
           $("btn-buzz").disabled = true;
           $("guess-input").disabled = true;
@@ -875,12 +865,10 @@ function handleMessage(msg, conn){
       break;
       
     case "round_answered":
-      // Un joueur a trouvé la réponse
       state.roundAnswered = true;
       state.roundAnsweredBy = msg.name;
       state.showAnswer = true;
       
-      // Bloquer les contrôles
       if(role === "player"){
         $("btn-buzz").disabled = true;
         $("guess-input").disabled = true;
@@ -888,7 +876,6 @@ function handleMessage(msg, conn){
         $("player-status").textContent = "Réponse déjà trouvée par " + msg.name + " !";
       }
       
-      // Afficher le banner
       if(msg.answer){
         showCorrectAnswerBanner(msg.name, msg.answer);
       }
@@ -901,7 +888,7 @@ function handleMessage(msg, conn){
       break;
       
     case "sharper":
-      if(state.stage > 0) state.stage--;
+      if(state.stage < STAGES.length - 1) state.stage++;
       render();
       break;
       
@@ -925,7 +912,6 @@ function handleMessage(msg, conn){
         state.scores[msg.name] = state.scores[msg.name] || 0;
         updateLeaderboard();
         
-        // Envoyer l'état actuel
         conn.send({
           type: "state",
           round: state.round,
@@ -945,7 +931,6 @@ function handleMessage(msg, conn){
         state.roundAnswered = msg.roundAnswered || false;
         state.scores = msg.scores || {};
         
-        // Bloquer les contrôles si la manche est déjà répondue
         if(state.roundAnswered){
           $("btn-buzz").disabled = true;
           $("guess-input").disabled = true;
@@ -982,7 +967,6 @@ function nextRound(){
   state.roundAnsweredBy = null;
   state.feed = [];
   
-  // Réinitialiser les contrôles des joueurs
   if(role === "player"){
     $("btn-buzz").disabled = false;
     $("guess-input").disabled = false;
@@ -999,7 +983,7 @@ function nextRound(){
 }
 
 function sharperImage(){
-  if(state.stage > 0) state.stage--;
+  if(state.stage < STAGES.length - 1) state.stage++;
   render();
   broadcast({ type: "sharper" });
 }
@@ -1087,7 +1071,6 @@ function connectToHost(peerId, name){
     $("conn-badge").style.display = "inline-block";
     $("conn-badge").textContent = "Connecté·e";
     
-    // Réinitialiser l'état
     state.round = 0;
     state.stage = 0;
     state.showAnswer = false;
@@ -1124,7 +1107,6 @@ function becomeHost(name){
   $("conn-badge").style.display = "none";
   $("round-badge").textContent = "Manche 1/" + ROUNDS.length;
   
-  // Réinitialiser l'état
   state.round = 0;
   state.stage = 0;
   state.showAnswer = false;
@@ -1136,7 +1118,6 @@ function becomeHost(name){
   render();
   updateLeaderboard();
   
-  // Pré-charger les images
   preloadImages();
 }
 
@@ -1167,12 +1148,10 @@ $("join-btn").addEventListener("click", () => {
   if(role === "host"){
     becomeHost(name);
   } else {
-    // Demander l'ID de l'animateur
     const peerId = prompt("Entrez l'ID de l'animateur (ou laissez vide pour créer une nouvelle partie) :");
     if(peerId && peerId.trim()){
       connectToHost(peerId.trim(), name);
     } else {
-      // Créer une nouvelle partie en tant qu'animateur
       becomeHost(name);
       role = "host";
     }
@@ -1188,7 +1167,6 @@ $("leave-btn").addEventListener("click", () => {
     hostConn = null;
   }
   
-  // Réinitialiser
   peer.destroy();
   setTimeout(() => {
     location.reload();
