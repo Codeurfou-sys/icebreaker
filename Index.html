@@ -1,0 +1,1282 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Image mystère — icebreaker</title>
+<style>
+  :root{
+    --cream:#F3E7DA;
+    --card:#FFFFFF;
+    --coral:#C97C74;
+    --coral-deep:#A85850;
+    --maroon:#7C332C;
+    --text:#3D2B26;
+    --muted:#8A736C;
+    --green:#4C8C6B;
+    --gold:#C99A3A;
+    --error:#B94A3F;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:"Calibri","Segoe UI",sans-serif;
+    background:var(--cream);
+    color:var(--text);
+    min-height:100vh;
+  }
+  .wrap{
+    max-width:920px;
+    margin:0 auto;
+    padding:32px 20px 60px;
+  }
+  h1{
+    font-family:Cambria, Georgia, serif;
+    font-size:28px;
+    margin:0 0 4px;
+    color:var(--maroon);
+  }
+  .sub{
+    color:var(--muted);
+    margin:0 0 20px;
+    font-size:15px;
+  }
+  .screen{ display:none; }
+  .screen.active{ display:block; }
+
+  .choice-row{
+    display:flex;
+    gap:16px;
+    flex-wrap:wrap;
+    margin-top:24px;
+  }
+  .choice-btn{
+    flex:1;
+    min-width:220px;
+    background:var(--card);
+    border:2px solid transparent;
+    border-radius:16px;
+    padding:28px 20px;
+    text-align:center;
+    cursor:pointer;
+    font-size:17px;
+    font-weight:700;
+    color:var(--maroon);
+    box-shadow:0 4px 14px rgba(0,0,0,0.08);
+    transition:border-color .15s, transform .15s;
+  }
+  .choice-btn:hover{ border-color:var(--coral); transform:translateY(-2px); }
+  .choice-btn .emoji{ font-size:38px; display:block; margin-bottom:10px; }
+  .choice-btn.disabled{ opacity:.6; cursor:wait; }
+
+  input[type=text]{
+    width:100%;
+    padding:14px 16px;
+    font-size:16px;
+    border-radius:10px;
+    border:2px solid #E5D3C8;
+    background:#fff;
+    color:var(--text);
+    font-family:inherit;
+  }
+  input[type=text]:focus{ outline:none; border-color:var(--coral); }
+
+  .primary-btn{
+    background:var(--coral);
+    color:#fff;
+    border:none;
+    padding:13px 22px;
+    border-radius:10px;
+    font-size:15px;
+    font-weight:700;
+    cursor:pointer;
+    font-family:inherit;
+  }
+  .primary-btn:hover{ background:var(--coral-deep); }
+  .primary-btn:disabled{ background:#D8C7BE; cursor:not-allowed; }
+
+  .ghost-btn{
+    background:transparent;
+    color:var(--maroon);
+    border:2px solid var(--coral);
+    padding:11px 20px;
+    border-radius:10px;
+    font-size:14px;
+    font-weight:700;
+    cursor:pointer;
+    font-family:inherit;
+  }
+  .ghost-btn:hover{ background:#F6E9E2; }
+
+  .top-bar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:14px;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  .badge{
+    background:var(--coral);
+    color:#fff;
+    padding:6px 14px;
+    border-radius:20px;
+    font-size:13px;
+    font-weight:700;
+  }
+  .conn-badge{
+    background:#EAF3EE;
+    color:var(--green);
+    padding:6px 14px;
+    border-radius:20px;
+    font-size:12.5px;
+    font-weight:700;
+  }
+
+  .share-box{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    background:var(--card);
+    border-radius:12px;
+    padding:12px 14px;
+    margin-bottom:18px;
+    box-shadow:0 4px 14px rgba(0,0,0,0.07);
+    flex-wrap:wrap;
+  }
+  .share-box input{
+    flex:1;
+    min-width:180px;
+    border:1px solid #E5D3C8;
+    border-radius:8px;
+    padding:8px 10px;
+    font-size:13px;
+    color:var(--muted);
+    background:#FAF4EF;
+  }
+  .share-box label{
+    font-size:13px;
+    font-weight:700;
+    color:var(--maroon);
+    white-space:nowrap;
+  }
+
+  .stage-card{
+    background:var(--card);
+    border-radius:20px;
+    padding:26px;
+    box-shadow:0 6px 24px rgba(0,0,0,0.1);
+    text-align:center;
+  }
+  canvas{
+    border-radius:14px;
+    width:280px;
+    height:280px;
+    image-rendering:pixelated;
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,0.06);
+    background:#EFE3D6;
+  }
+
+  .answer-box{
+    margin-top:18px;
+    background:#F6E9E2;
+    border-radius:12px;
+    padding:16px 18px;
+    text-align:left;
+    display:none;
+  }
+  .answer-box.show{ display:block; }
+  .answer-box .a-title{
+    font-weight:700;
+    color:var(--maroon);
+    font-size:17px;
+    margin-bottom:6px;
+  }
+  .answer-box .a-tie{
+    font-size:14px;
+    color:var(--text);
+    line-height:1.45;
+  }
+
+  .host-controls{
+    display:flex;
+    gap:10px;
+    justify-content:center;
+    flex-wrap:wrap;
+    margin-top:20px;
+  }
+
+  .player-controls{
+    margin-top:22px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    align-items:center;
+  }
+  .buzz-btn{
+    background:var(--maroon);
+    color:#fff;
+    border:none;
+    width:170px;
+    height:60px;
+    border-radius:50px;
+    font-size:16px;
+    font-weight:800;
+    cursor:pointer;
+    box-shadow:0 4px 0 #5B231D;
+  }
+  .buzz-btn:active{ transform:translateY(3px); box-shadow:0 1px 0 #5B231D; }
+  .buzz-btn:disabled{ background:#D8C7BE; box-shadow:none; cursor:not-allowed; }
+  .guess-row{
+    display:flex;
+    gap:8px;
+    width:100%;
+    max-width:360px;
+  }
+  .status-line{
+    font-size:13px;
+    color:var(--muted);
+    min-height:18px;
+  }
+
+  .feed{
+    margin-top:26px;
+    background:var(--card);
+    border-radius:16px;
+    padding:18px 20px;
+    box-shadow:0 4px 14px rgba(0,0,0,0.07);
+  }
+  .feed h3{
+    margin:0 0 10px;
+    font-size:14px;
+    color:var(--maroon);
+  }
+  .feed-item{
+    display:flex;
+    justify-content:space-between;
+    padding:7px 0;
+    border-bottom:1px solid #F1E4DA;
+    font-size:14px;
+  }
+  .feed-item:last-child{ border-bottom:none; }
+  .feed-item .name{ font-weight:700; }
+  .feed-item.first .name::before{ content:"🏆 "; }
+  .feed-empty{ color:var(--muted); font-size:13px; font-style:italic; }
+
+  .leaderboard{ border:1.5px solid #F0DCC8; }
+  .lb-item{
+    display:flex;
+    justify-content:space-between;
+    padding:8px 4px;
+    border-bottom:1px solid #F1E4DA;
+    font-size:14.5px;
+    font-weight:700;
+    color:var(--text);
+  }
+  .lb-item:last-child{ border-bottom:none; }
+  .lb-pts{ color:var(--coral-deep); }
+
+  .lock-status{
+    margin-top:16px;
+    text-align:center;
+    font-size:14px;
+    font-weight:700;
+    color:var(--maroon);
+    background:#F6E9E2;
+    border-radius:10px;
+    padding:10px;
+  }
+
+  .error-banner{
+    display:none;
+    background:#FBEAE7;
+    border:1.5px solid var(--error);
+    color:var(--error);
+    border-radius:10px;
+    padding:12px 16px;
+    font-size:13.5px;
+    margin-bottom:16px;
+    line-height:1.4;
+  }
+  .error-banner.show{ display:block; }
+
+  .correct-banner{
+    display:none;
+    background:#EAF3EE;
+    border:1.5px solid var(--green);
+    color:var(--green);
+    border-radius:10px;
+    padding:12px 16px;
+    font-size:14px;
+    font-weight:700;
+    margin-bottom:16px;
+    text-align:center;
+  }
+  .correct-banner.show{ display:block; }
+
+  .credit{
+    margin-top:8px;
+    font-size:11px;
+    color:var(--muted);
+  }
+
+  .footer-note{
+    margin-top:30px;
+    font-size:12px;
+    color:var(--muted);
+    text-align:center;
+  }
+</style>
+<script src="https://unpkg.com/peerjs@1/dist/peerjs.min.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>🖼️ Image mystère</h1>
+  <p class="sub">Un icebreaker à jouer ensemble, en visio — devinez ce qui se cache derrière le pixel.</p>
+
+  <div class="error-banner" id="error-banner"></div>
+  <div class="correct-banner" id="correct-banner"></div>
+
+  <!-- ROLE SCREEN -->
+  <div id="screen-role" class="screen active">
+    <div class="choice-row">
+      <div class="choice-btn" id="pick-host">
+        <span class="emoji">🎤</span>
+        <span id="host-btn-label">Je suis l'animateur·rice</span>
+      </div>
+      <div class="choice-btn" id="pick-player">
+        <span class="emoji">🙋</span>
+        <span id="player-btn-label">Je suis participant·e</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- NAME SCREEN -->
+  <div id="screen-name" class="screen">
+    <div class="stage-card" style="text-align:left; max-width:420px; margin:0 auto;">
+      <p style="margin-top:0; font-weight:700; color:var(--maroon);">Votre prénom</p>
+      <input type="text" id="name-input" placeholder="Ex : Camille" maxlength="24">
+      <div style="margin-top:16px; text-align:right;">
+        <button class="primary-btn" id="join-btn">Rejoindre la partie</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME SCREEN -->
+  <div id="screen-game" class="screen">
+    <div class="top-bar">
+      <span class="badge" id="round-badge">Manche 1/10</span>
+      <span class="conn-badge" id="conn-badge" style="display:none;"></span>
+      <button class="ghost-btn" id="leave-btn">Changer de rôle</button>
+    </div>
+
+    <div class="share-box" id="share-box" style="display:none;">
+      <label>🔗 Lien à partager :</label>
+      <input type="text" id="share-link" readonly>
+      <button class="ghost-btn" id="copy-link-btn">Copier</button>
+    </div>
+
+    <div class="stage-card">
+      <canvas id="pix-canvas" width="280" height="280"></canvas>
+
+      <div class="answer-box" id="answer-box">
+        <div class="a-title" id="answer-title"></div>
+        <div class="a-tie" id="answer-tie"></div>
+      </div>
+
+      <!-- HOST CONTROLS -->
+      <div class="host-controls" id="host-controls" style="display:none;">
+        <button class="ghost-btn" id="btn-sharper">🔍 Plus net</button>
+        <button class="primary-btn" id="btn-reveal">✅ Révéler la réponse</button>
+        <button class="ghost-btn" id="btn-next">➡️ Manche suivante</button>
+        <button class="ghost-btn" id="btn-reset">↺ Réinitialiser</button>
+      </div>
+      <div class="lock-status" id="host-lock-status" style="display:none;"></div>
+
+      <!-- PLAYER CONTROLS -->
+      <div class="player-controls" id="player-controls" style="display:none;">
+        <button class="buzz-btn" id="btn-buzz">🔔 Je buzz !</button>
+        <div class="guess-row" id="guess-row" style="display:none;">
+          <input type="text" id="guess-input" placeholder="Votre réponse...">
+          <button class="primary-btn" id="btn-send-guess">Envoyer</button>
+        </div>
+        <div class="status-line" id="player-status"></div>
+      </div>
+
+      <div class="credit" id="img-credit"></div>
+    </div>
+
+    <div class="feed leaderboard">
+      <h3>🏆 Classement</h3>
+      <div id="leaderboard-list"><div class="feed-empty">Aucun point marqué pour le moment.</div></div>
+    </div>
+
+    <div class="feed">
+      <h3>Réponses et buzz de cette manche</h3>
+      <div id="feed-list"><div class="feed-empty">Personne n'a encore répondu.</div></div>
+    </div>
+  </div>
+
+  <p class="footer-note">Cet outil connecte les navigateurs directement entre eux (technologie WebRTC, via la bibliothèque libre PeerJS) — aucune donnée n'est stockée sur un serveur, aucune inscription, aucune donnée personnelle autre que le prénom que vous tapez.</p>
+</div>
+
+<script>
+// ============================================
+// CONFIGURATION
+// ============================================
+
+const FP = "https://commons.wikimedia.org/wiki/Special:FilePath/";
+function roundUrl(r){
+  return r.dataUri || r.url || (FP + encodeURIComponent(r.file).replace(/%2C/g,",") + "?width=500");
+}
+
+const STAGES = [46, 26, 14, 7, 1];
+
+// ============================================
+// ROUNDS - Tableau complet avec 10 images
+// ============================================
+
+const ROUNDS = [
+  {
+    file: "International_Symbol_of_Access.svg",
+    answer: "Le symbole international du handicap",
+    tie: "Créé en 1968 par Susanne Koefoed, une étudiante danoise en design — pourtant, aujourd'hui, 80% des handicaps sont en réalité invisibles.",
+    credit: "Wikimedia Commons, domaine public",
+    keywords: ["symbole handicap", "panneau handicap", "pictogramme handicap", "logo handicap", "picto handicap", "handicap", "fauteuil roulant symbole"]
+  },
+  {
+    file: "Canne blanche.jpg",
+    answer: "Canne blanche",
+    tie: "Outil d'autonomie essentiel pour les personnes malvoyantes ou aveugles.",
+    credit: "Photo libre de droits",
+    keywords: ["canne", "canne blanche", "canne pour aveugle", "canne pour malvoyant"]
+  },
+  {
+    file: "Deficients-visuels-CMJN.webp",
+    answer: "Symbole déficience visuelle",
+    tie: "Ce pictogramme représente les troubles de la vision et l'accessibilité pour les personnes malvoyantes.",
+    credit: "Wikimedia Commons",
+    keywords: ["symbole déficience visuelle", "déficience visuelle", "pictogramme aveugle", "pictogramme malvoyant", "symbole malvoyant"]
+  },
+  {
+    file: "fauteuil roulant.jpg",
+    answer: "Fauteuil roulant",
+    tie: "Équipement de mobilité pour les personnes à mobilité réduite.",
+    credit: "Photo libre de droits",
+    keywords: ["fauteuil roulant", "fauteuil", "chaise roulante"]
+  },
+  {
+    file: "Deficients-auditifs-CMJN-10x10-cm.webp",
+    answer: "Déficience auditive",
+    tie: "Ce symbole représente les troubles de l'audition et l'accessibilité pour les personnes sourdes ou malentendantes.",
+    credit: "Wikimedia Commons",
+    keywords: ["déficience auditive", "pictogramme surdité", "symbole mal entendant", "mal entendant", "sourd", "symbole sourd", "problème auditif"]
+  },
+  {
+    file: "handicap-psychique-cognitif-min.jpg",
+    answer: "Symbole déficience psychique",
+    tie: "Représente les troubles psychiques et cognitifs, souvent invisibles mais bien réels.",
+    credit: "Photo libre de droits",
+    keywords: ["symbole déficience psychique", "pictogramme déficience psychique", "pictogramme maladie mentale", "pictogramme problèmes psychiques", "troubles psychiques", "handicap psychique"]
+  },
+  {
+    file: "17-300x264.jpg",
+    answer: "Handicap mental",
+    tie: "Ce pictogramme symbolise les handicaps intellectuels et les troubles cognitifs.",
+    credit: "Photo libre de droits",
+    keywords: ["pictogramme handicap mental", "handicap mental", "handicaps mentaux", "déficience intellectuelle"]
+  },
+  {
+    file: "image-2.png",
+    answer: "Place de parking handicapé",
+    tie: "Espace réservé pour faciliter l'accès des personnes à mobilité réduite.",
+    credit: "Photo libre de droits",
+    keywords: ["place de parking handicapé", "place handicapé", "une place handicapé", "parking handicap", "stationnement handicapé"]
+  },
+  {
+    file: "LOGO_AD-300x150.png",
+    answer: "Logo audio description",
+    tie: "Symbole de l'audiodescription, service qui rend les films et spectacles accessibles aux personnes aveugles ou malvoyantes.",
+    credit: "Logo officiel",
+    keywords: ["logo audio description", "audio description", "symbole audiodescription", "audiodescription", "AD"]
+  },
+  {
+    file: "braille bon.png",
+    answer: "Braille",
+    tie: "Système d'écriture tactile à points saillants, inventé par Louis Braille en 1829.",
+    credit: "Image libre de droits",
+    keywords: ["braille", "alphabet braille", "du braille", "écriture braille", "points braille"]
+  }
+];
+
+// ============================================
+// ÉTAT GLOBAL
+// ============================================
+
+let role = null;
+let playerName = "";
+let peer = null;
+let conns = [];
+let hostConn = null;
+let state = {
+  round: 0,
+  stage: 0,
+  showAnswer: false,
+  buzzes: {},
+  scores: {},
+  lock: null,
+  roundAnswered: false,
+  roundAnsweredBy: null
+};
+let lastFeedStamp = "";
+let lastLockKey = "";
+let lockTimer = null;
+let countdownTimer = null;
+
+// ============================================
+// UTILITAIRES
+// ============================================
+
+const $ = (id) => document.getElementById(id);
+
+// Articles à supprimer pour la validation
+const ARTICLES = ['un ', 'une ', 'le ', 'la ', 'les ', 'des ', 'du ', 'de ', "l'", 'au ', 'aux '];
+
+// Normalisation améliorée
+function normalizeStr(s){
+  if(!s) return "";
+  let str = s
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  
+  // Supprimer les articles au début et à la fin
+  for(const article of ARTICLES){
+    while(str.startsWith(article)){
+      str = str.substring(article.length).trim();
+    }
+    while(str.endsWith(article.trim())){
+      str = str.substring(0, str.length - article.trim().length).trim();
+    }
+  }
+  return str.trim();
+}
+
+// Vérification avec pluriels et variantes
+function isCorrectAnswer(guess, keywords){
+  const g = normalizeStr(guess);
+  if(!g) return false;
+  
+  return keywords.some(k => {
+    const nk = normalizeStr(k);
+    if(!nk) return false;
+    
+    // Vérifier si la réponse contient le keyword ou vice versa
+    if(g === nk) return true;
+    if(g.includes(nk)) return true;
+    if(nk.includes(g)) return true;
+    
+    // Vérifier avec les pluriels
+    const keywordVariants = [nk];
+    if(!nk.endsWith('s')) keywordVariants.push(nk + 's');
+    if(!nk.endsWith('x')) keywordVariants.push(nk + 'x');
+    if(!nk.endsWith('es')) keywordVariants.push(nk + 'es');
+    if(!nk.endsWith('aux')) keywordVariants.push(nk + 'aux');
+    
+    const guessVariants = [g];
+    if(!g.endsWith('s')) guessVariants.push(g + 's');
+    if(!g.endsWith('x')) guessVariants.push(g + 'x');
+    if(!g.endsWith('es')) guessVariants.push(g + 'es');
+    if(!g.endsWith('aux')) guessVariants.push(g + 'aux');
+    
+    for(const kv of keywordVariants){
+      for(const gv of guessVariants){
+        if(gv === kv) return true;
+        if(gv.includes(kv)) return true;
+        if(kv.includes(gv)) return true;
+      }
+    }
+    
+    return false;
+  });
+}
+
+// Buzz sound
+let audioCtx = null;
+function playBuzzSound(){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const now = audioCtx.currentTime;
+    [880, 660].forEach((freq, i) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "square";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.001, now + i*0.13);
+      gain.gain.exponentialRampToValueAtTime(0.25, now + i*0.13 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i*0.13 + 0.22);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(now + i*0.13);
+      osc.stop(now + i*0.13 + 0.24);
+    });
+  }catch(e){}
+}
+
+// Image preloading
+const imgCache = {};
+function preloadImages(){
+  ROUNDS.forEach((r, idx) => {
+    const entry = { status: "loading", img: null };
+    imgCache[idx] = entry;
+    const im = new Image();
+    im.onload = () => { entry.status = "loaded"; entry.img = im; render(); };
+    im.onerror = () => { entry.status = "error"; render(); };
+    im.src = roundUrl(r);
+    im.crossOrigin = "anonymous";
+  });
+}
+
+function showScreen(id){
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  $(id).classList.add("active");
+}
+
+function showError(msg){
+  const el = $("error-banner");
+  el.textContent = "⚠️ " + msg;
+  el.classList.add("show");
+}
+function clearError(){
+  $("error-banner").classList.remove("show");
+}
+
+function showCorrectAnswerBanner(playerName, answerText){
+  const banner = $("correct-banner");
+  banner.textContent = "✅ Bonne réponse ! " + escapeHtml(playerName) + " a trouvé : " + escapeHtml(answerText);
+  banner.classList.add("show");
+  setTimeout(() => banner.classList.remove("show"), 5000);
+}
+
+// ============================================
+// RENDU
+// ============================================
+
+function escapeHtml(s){
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function drawPixelated(canvas, roundIdx, blockSize){
+  const size = 280;
+  const ctx = canvas.getContext("2d");
+  const round = ROUNDS[roundIdx];
+  const entry = imgCache[roundIdx];
+  ctx.clearRect(0,0,size,size);
+  
+  if(!entry || entry.status === "loading"){
+    ctx.fillStyle = "#EFE3D6";
+    ctx.fillRect(0,0,size,size);
+    ctx.fillStyle = "#8A736C";
+    ctx.font = "16px Calibri";
+    ctx.textAlign = "center";
+    ctx.fillText("Chargement de l'image...", size/2, size/2);
+    return;
+  }
+  if(entry.status === "error"){
+    ctx.fillStyle = "#EFE3D6";
+    ctx.fillRect(0,0,size,size);
+    ctx.fillStyle = "#8A736C";
+    ctx.font = "15px Calibri";
+    ctx.textAlign = "center";
+    ctx.fillText("🖼️ Image indisponible", size/2, size/2 - 8);
+    ctx.fillText("(passez à la manche suivante)", size/2, size/2 + 14);
+    return;
+  }
+  const img = entry.img;
+  const src = document.createElement("canvas");
+  src.width = size; src.height = size;
+  const sctx = src.getContext("2d");
+  const scale = Math.max(size/img.naturalWidth, size/img.naturalHeight);
+  const w = img.naturalWidth*scale, h = img.naturalHeight*scale;
+  sctx.drawImage(img, (size-w)/2, (size-h)/2, w, h);
+  if(blockSize <= 1){
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(src, 0, 0);
+    return;
+  }
+  const tw = Math.max(1, Math.round(size/blockSize));
+  const tiny = document.createElement("canvas");
+  tiny.width = tw; tiny.height = tw;
+  const tctx = tiny.getContext("2d");
+  tctx.imageSmoothingEnabled = true;
+  tctx.drawImage(src, 0, 0, tw, tw);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(tiny, 0, 0, tw, tw, 0, 0, size, size);
+}
+
+function render(){
+  const canvas = $("pix-canvas");
+  const blockSize = STAGES[state.stage] || 1;
+  drawPixelated(canvas, state.round, blockSize);
+  
+  // Mettre à jour le badge de manche
+  $("round-badge").textContent = "Manche " + (state.round + 1) + "/" + ROUNDS.length;
+  
+  // Mettre à jour le crédit de l'image
+  const round = ROUNDS[state.round];
+  if(round && round.credit){
+    $("img-credit").textContent = "Image : " + round.credit;
+  }
+  
+  // Afficher ou masquer la réponse
+  const answerBox = $("answer-box");
+  const answerTitle = $("answer-title");
+  const answerTie = $("answer-tie");
+  
+  if(state.showAnswer && round){
+    answerTitle.textContent = round.answer;
+    answerTie.textContent = round.tie;
+    answerBox.classList.add("show");
+  } else {
+    answerBox.classList.remove("show");
+  }
+  
+  // Mettre à jour les contrôles de l'animateur
+  if(role === "host"){
+    const lockStatus = $("host-lock-status");
+    if(state.lock){
+      lockStatus.style.display = "block";
+      lockStatus.textContent = "✅ Manche verrouillée - " + state.lock;
+    } else {
+      lockStatus.style.display = "none";
+    }
+  }
+}
+
+function updateFeed(){
+  const list = $("feed-list");
+  const feed = state.feed || [];
+  
+  if(feed.length === 0){
+    list.innerHTML = '<div class="feed-empty">Personne n\'a encore répondu.</div>';
+    return;
+  }
+  
+  list.innerHTML = feed.map((item, idx) => {
+    const isFirst = idx === 0 && item.correct;
+    const className = isFirst ? "feed-item first" : "feed-item";
+    return '<div class="' + className + '"><span class="name">' + escapeHtml(item.name) + '</span><span>' + escapeHtml(item.text) + '</span></div>';
+  }).join("");
+}
+
+function updateLeaderboard(){
+  const list = $("leaderboard-list");
+  const scores = state.scores;
+  const entries = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+  
+  if(entries.length === 0){
+    list.innerHTML = '<div class="feed-empty">Aucun point marqué pour le moment.</div>';
+    return;
+  }
+  
+  list.innerHTML = entries.map(([name, pts]) => {
+    return '<div class="lb-item"><span>' + escapeHtml(name) + '</span><span class="lb-pts">' + pts + ' pt' + (pts > 1 ? 's' : '') + '</span></div>';
+  }).join("");
+}
+
+// ============================================
+// GESTION DES MESSAGES
+// ============================================
+
+function addFeedItem(name, text, isCorrect = false){
+  const timestamp = Date.now();
+  state.feed = state.feed || [];
+  state.feed.push({ name, text, timestamp, correct: isCorrect });
+  
+  // Garder seulement les 20 derniers éléments
+  if(state.feed.length > 20){
+    state.feed = state.feed.slice(-20);
+  }
+  
+  updateFeed();
+  
+  // Si c'est une bonne réponse, afficher le banner
+  if(isCorrect){
+    const round = ROUNDS[state.round];
+    if(round){
+      showCorrectAnswerBanner(name, round.answer);
+    }
+  }
+}
+
+function handleMessage(msg, conn){
+  if(!msg || !msg.type) return;
+  
+  switch(msg.type){
+    case "buzz":
+      state.buzzes[msg.name] = msg.timestamp || Date.now();
+      addFeedItem(msg.name, "a buzzé !");
+      if(role === "host"){
+        playBuzzSound();
+      }
+      break;
+      
+    case "guess":
+      if(state.roundAnswered) break; // Ne pas accepter de nouvelles réponses
+      
+      const round = ROUNDS[state.round];
+      if(round && isCorrectAnswer(msg.guess, round.keywords)){
+        // Bonne réponse !
+        state.roundAnswered = true;
+        state.roundAnsweredBy = msg.name;
+        
+        // Ajouter au score
+        state.scores[msg.name] = (state.scores[msg.name] || 0) + 1;
+        
+        // Afficher la réponse
+        state.showAnswer = true;
+        
+        // Ajouter au feed
+        addFeedItem(msg.name, "a trouvé ! 🎉", true);
+        
+        // Envoyer à tous que la manche est terminée
+        broadcast({
+          type: "round_answered",
+          name: msg.name,
+          round: state.round,
+          answer: round.answer
+        });
+        
+        // Bloquer les contrôles des joueurs
+        if(role === "player"){
+          $("btn-buzz").disabled = true;
+          $("guess-input").disabled = true;
+          $("btn-send-guess").disabled = true;
+          $("player-status").textContent = "Réponse déjà trouvée !";
+        }
+        
+        render();
+        updateLeaderboard();
+      } else {
+        addFeedItem(msg.name, "a proposé : " + msg.guess);
+      }
+      break;
+      
+    case "round_answered":
+      // Un joueur a trouvé la réponse
+      state.roundAnswered = true;
+      state.roundAnsweredBy = msg.name;
+      state.showAnswer = true;
+      
+      // Bloquer les contrôles
+      if(role === "player"){
+        $("btn-buzz").disabled = true;
+        $("guess-input").disabled = true;
+        $("btn-send-guess").disabled = true;
+        $("player-status").textContent = "Réponse déjà trouvée par " + msg.name + " !";
+      }
+      
+      // Afficher le banner
+      if(msg.answer){
+        showCorrectAnswerBanner(msg.name, msg.answer);
+      }
+      
+      render();
+      break;
+      
+    case "next_round":
+      nextRound();
+      break;
+      
+    case "sharper":
+      if(state.stage > 0) state.stage--;
+      render();
+      break;
+      
+    case "reveal":
+      state.showAnswer = true;
+      render();
+      break;
+      
+    case "reset":
+      resetGame();
+      break;
+      
+    case "lock":
+      state.lock = msg.lock;
+      lastLockKey = msg.key;
+      render();
+      break;
+      
+    case "join":
+      if(role === "host"){
+        state.scores[msg.name] = state.scores[msg.name] || 0;
+        updateLeaderboard();
+        
+        // Envoyer l'état actuel
+        conn.send({
+          type: "state",
+          round: state.round,
+          stage: state.stage,
+          showAnswer: state.showAnswer,
+          roundAnswered: state.roundAnswered,
+          scores: state.scores
+        });
+      }
+      break;
+      
+    case "state":
+      if(role === "player"){
+        state.round = msg.round || 0;
+        state.stage = msg.stage || 0;
+        state.showAnswer = msg.showAnswer || false;
+        state.roundAnswered = msg.roundAnswered || false;
+        state.scores = msg.scores || {};
+        
+        // Bloquer les contrôles si la manche est déjà répondue
+        if(state.roundAnswered){
+          $("btn-buzz").disabled = true;
+          $("guess-input").disabled = true;
+          $("btn-send-guess").disabled = true;
+          $("player-status").textContent = "Réponse déjà trouvée !";
+        }
+        
+        render();
+        updateLeaderboard();
+      }
+      break;
+  }
+}
+
+function broadcast(msg){
+  if(role === "host"){
+    conns.forEach(c => {
+      try { c.send(msg); } catch(e) {}
+    });
+  } else if(hostConn){
+    try { hostConn.send(msg); } catch(e) {}
+  }
+}
+
+// ============================================
+// GESTION DU JEU
+// ============================================
+
+function nextRound(){
+  state.round = (state.round + 1) % ROUNDS.length;
+  state.stage = 0;
+  state.showAnswer = false;
+  state.roundAnswered = false;
+  state.roundAnsweredBy = null;
+  state.feed = [];
+  
+  // Réinitialiser les contrôles des joueurs
+  if(role === "player"){
+    $("btn-buzz").disabled = false;
+    $("guess-input").disabled = false;
+    $("btn-send-guess").disabled = false;
+    $("guess-input").value = "";
+    $("player-status").textContent = "";
+    $("guess-row").style.display = "none";
+  }
+  
+  render();
+  updateFeed();
+  
+  broadcast({ type: "next_round" });
+}
+
+function sharperImage(){
+  if(state.stage > 0) state.stage--;
+  render();
+  broadcast({ type: "sharper" });
+}
+
+function revealAnswer(){
+  state.showAnswer = true;
+  render();
+  broadcast({ type: "reveal" });
+}
+
+function resetGame(){
+  state.round = 0;
+  state.stage = 0;
+  state.showAnswer = false;
+  state.roundAnswered = false;
+  state.roundAnsweredBy = null;
+  state.feed = [];
+  state.scores = {};
+  state.buzzes = {};
+  
+  render();
+  updateFeed();
+  updateLeaderboard();
+  
+  broadcast({ type: "reset" });
+}
+
+// ============================================
+// PEERJS - CONNEXIONS
+// ============================================
+
+function initPeer(){
+  peer = new Peer();
+  
+  peer.on("open", (id) => {
+    console.log("PeerJS connecté avec ID :", id);
+    $("share-link").value = location.origin + location.pathname + "?peer=" + id;
+  });
+  
+  peer.on("error", (err) => {
+    console.error("PeerJS error:", err);
+    showError("Erreur de connexion PeerJS. Vérifiez votre connexion internet.");
+  });
+  
+  peer.on("connection", (conn) => {
+    conn.on("open", () => {
+      conns.push(conn);
+      if(role === "host"){
+        conn.send({ type: "role", role: "host" });
+        conn.send({
+          type: "state",
+          round: state.round,
+          stage: state.stage,
+          showAnswer: state.showAnswer,
+          roundAnswered: state.roundAnswered,
+          scores: state.scores
+        });
+      }
+    });
+    
+    conn.on("data", (data) => handleMessage(data, conn));
+    conn.on("close", () => {
+      conns = conns.filter(c => c !== conn);
+    });
+    conn.on("error", (err) => {
+      console.error("Connection error:", err);
+      conns = conns.filter(c => c !== conn);
+    });
+  });
+}
+
+function connectToHost(peerId, name){
+  clearError();
+  $("host-btn-label").textContent = "Connexion en cours...";
+  $("pick-host").classList.add("disabled");
+  
+  hostConn = peer.connect(peerId, { reliable: true });
+  
+  hostConn.on("open", () => {
+    hostConn.send({ type: "join", name: name });
+    showScreen("screen-game");
+    $("player-controls").style.display = "flex";
+    $("host-controls").style.display = "none";
+    $("share-box").style.display = "none";
+    $("conn-badge").style.display = "inline-block";
+    $("conn-badge").textContent = "Connecté·e";
+    
+    // Réinitialiser l'état
+    state.round = 0;
+    state.stage = 0;
+    state.showAnswer = false;
+    state.roundAnswered = false;
+    state.scores = {};
+    state.feed = [];
+    
+    render();
+  });
+  
+  hostConn.on("error", (err) => {
+    showError("Impossible de se connecter à l'animateur. Vérifiez l'ID.");
+    $("pick-host").classList.remove("disabled");
+    $("host-btn-label").textContent = "Je suis l'animateur·rice";
+  });
+  
+  hostConn.on("data", (data) => handleMessage(data));
+  hostConn.on("close", () => {
+    showError("Déconnecté·e de l'animateur.");
+    showScreen("screen-role");
+    $("pick-host").classList.remove("disabled");
+    $("host-btn-label").textContent = "Je suis l'animateur·rice";
+  });
+}
+
+function becomeHost(name){
+  role = "host";
+  playerName = name;
+  
+  showScreen("screen-game");
+  $("host-controls").style.display = "flex";
+  $("player-controls").style.display = "none";
+  $("share-box").style.display = "flex";
+  $("conn-badge").style.display = "none";
+  $("round-badge").textContent = "Manche 1/" + ROUNDS.length;
+  
+  // Réinitialiser l'état
+  state.round = 0;
+  state.stage = 0;
+  state.showAnswer = false;
+  state.roundAnswered = false;
+  state.scores = {};
+  state.feed = [];
+  state.scores[name] = 0;
+  
+  render();
+  updateLeaderboard();
+  
+  // Pré-charger les images
+  preloadImages();
+}
+
+// ============================================
+// ÉCOUTEURS D'ÉVÉNEMENTS
+// ============================================
+
+$("pick-host").addEventListener("click", () => {
+  showScreen("screen-name");
+  role = "host";
+});
+
+$("pick-player").addEventListener("click", () => {
+  showScreen("screen-name");
+  role = "player";
+});
+
+$("join-btn").addEventListener("click", () => {
+  const name = $("name-input").value.trim();
+  if(!name || name.length < 2){
+    showError("Veuillez entrer un prénom valide.");
+    return;
+  }
+  
+  playerName = name;
+  clearError();
+  
+  if(role === "host"){
+    becomeHost(name);
+  } else {
+    // Demander l'ID de l'animateur
+    const peerId = prompt("Entrez l'ID de l'animateur (ou laissez vide pour créer une nouvelle partie) :");
+    if(peerId && peerId.trim()){
+      connectToHost(peerId.trim(), name);
+    } else {
+      // Créer une nouvelle partie en tant qu'animateur
+      becomeHost(name);
+      role = "host";
+    }
+  }
+});
+
+$("leave-btn").addEventListener("click", () => {
+  if(role === "host"){
+    conns.forEach(c => c.close());
+    conns = [];
+  } else {
+    if(hostConn) hostConn.close();
+    hostConn = null;
+  }
+  
+  // Réinitialiser
+  peer.destroy();
+  setTimeout(() => {
+    location.reload();
+  }, 500);
+});
+
+$("copy-link-btn").addEventListener("click", () => {
+  const input = $("share-link");
+  input.select();
+  document.execCommand("copy");
+  const originalText = $("copy-link-btn").textContent;
+  $("copy-link-btn").textContent = "Copié !";
+  setTimeout(() => {
+    $("copy-link-btn").textContent = originalText;
+  }, 2000);
+});
+
+// Contrôles de l'animateur
+$("btn-sharper").addEventListener("click", sharperImage);
+$("btn-reveal").addEventListener("click", revealAnswer);
+$("btn-next").addEventListener("click", nextRound);
+$("btn-reset").addEventListener("click", resetGame);
+
+// Contrôles du joueur
+$("btn-buzz").addEventListener("click", () => {
+  if(state.roundAnswered) return;
+  
+  playBuzzSound();
+  $("guess-row").style.display = "flex";
+  $("guess-input").focus();
+  $("player-status").textContent = "Buzz ! À vous de répondre.";
+  
+  broadcast({ type: "buzz", name: playerName, timestamp: Date.now() });
+});
+
+$("btn-send-guess").addEventListener("click", () => {
+  if(state.roundAnswered) return;
+  
+  const guess = $("guess-input").value.trim();
+  if(!guess) return;
+  
+  $("guess-input").value = "";
+  $("guess-row").style.display = "none";
+  $("player-status").textContent = "Réponse envoyée.";
+  
+  broadcast({ type: "guess", name: playerName, guess: guess, round: state.round });
+});
+
+$("guess-input").addEventListener("keypress", (e) => {
+  if(e.key === "Enter"){
+    $("btn-send-guess").click();
+  }
+});
+
+// ============================================
+// INITIALISATION
+// ============================================
+
+// Charger les paramètres de l'URL
+const urlParams = new URLSearchParams(window.location.search);
+const peerId = urlParams.get("peer");
+
+// Initialiser PeerJS
+initPeer();
+
+// Si un ID est présent dans l'URL, se connecter automatiquement
+if(peerId && role !== "host"){
+  role = "player";
+  showScreen("screen-name");
+}
+
+// Pré-charger les images
+preloadImages();
+
+// Gérer le retour en arrière
+window.addEventListener("popstate", () => {
+  if(role !== null){
+    if(confirm("Voulez-vous quitter la partie ?")){
+      if(role === "host"){
+        conns.forEach(c => c.close());
+      } else if(hostConn){
+        hostConn.close();
+      }
+      peer.destroy();
+    } else {
+      history.pushState(null, null, window.location.href);
+    }
+  }
+});
+
+// Empêcher le rafraîchissement
+window.addEventListener("beforeunload", () => {
+  if(role === "host"){
+    conns.forEach(c => c.close());
+  } else if(hostConn){
+    hostConn.close();
+  }
+});
+</script>
