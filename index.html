@@ -303,7 +303,7 @@
       
       <div id="manual-peer-container" style="display:none; margin-top:14px;">
         <p style="margin:0 0 6px 0; font-size:13px; font-weight:700; color:var(--maroon);">Code ID Animateur</p>
-        <input type="text" id="peer-id-input" placeholder="Collez l'ID ici (ex: abc-123)">
+        <input type="text" id="peer-id-input" placeholder="Collez l'ID ici">
       </div>
 
       <div style="margin-top:16px; text-align:right;">
@@ -327,7 +327,7 @@
         <input type="text" id="share-link" readonly value="Génération du lien en cours...">
         <button class="ghost-btn" id="copy-link-btn">Copier le lien</button>
       </div>
-      <div style="font-size:12px; color:var(--muted);" id="host-id-display">Code ID : en attente...</div>
+      <div style="font-size:13px; font-weight:700; color:var(--coral-deep); margin-top:4px;" id="host-id-display">Code ID : en attente...</div>
     </div>
 
     <div class="stage-card">
@@ -415,15 +415,20 @@ let state = {
 let hostTimerInterval = null;
 const $ = (id) => document.getElementById(id);
 
-// --- PEERJS INIT ---
+function updateHostShareInfo(){
+  if(!myPeerId) return;
+  const baseUrl = window.location.href.split('?')[0];
+  const fullUrl = baseUrl + "?peer=" + myPeerId;
+  $("share-link").value = fullUrl;
+  $("host-id-display").textContent = "Code ID direct : " + myPeerId;
+}
+
 function initPeer(){
   peer = new Peer();
 
   peer.on("open", (id) => {
     myPeerId = id;
-    if(role === "host"){
-      updateHostShareInfo();
-    }
+    updateHostShareInfo();
   });
 
   peer.on("error", (err) => {
@@ -443,14 +448,6 @@ function initPeer(){
   });
 }
 
-function updateHostShareInfo(){
-  if(!myPeerId) return;
-  const url = window.location.protocol + "//" + window.location.host + window.location.pathname + "?peer=" + myPeerId;
-  $("share-link").value = url;
-  $("host-id-display").textContent = "Ou donnez directement ce Code ID : " + myPeerId;
-}
-
-// --- NORMALISATION ---
 const ARTICLES = ['un ', 'une ', 'le ', 'la ', 'les ', 'des ', 'du ', 'de ', "l'", 'au ', 'aux '];
 function normalizeStr(s){
   if(!s) return "";
@@ -468,7 +465,6 @@ function isCorrectAnswer(guess, keywords){
   });
 }
 
-// --- IMAGES ---
 const imgCache = {};
 function preloadImages(){
   ROUNDS.forEach((r, idx) => {
@@ -526,7 +522,6 @@ function drawPixelated(canvas, roundIdx, blockSize){
   ctx.drawImage(tiny, 0, 0, tw, tw, 0, 0, size, size);
 }
 
-// --- UI / RENDER ---
 function showScreen(id){
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
   $(id).classList.add("active");
@@ -623,7 +618,6 @@ function addFeedItem(name, text){
   updateFeed();
 }
 
-// --- CHRONO ---
 function startResponseTimer(){
   clearInterval(hostTimerInterval);
   state.timerSeconds = RESPONSE_TIME_LIMIT;
@@ -647,7 +641,6 @@ function stopResponseTimer(){
   state.timerSeconds = 0;
 }
 
-// --- NETWORK ---
 function handleMessage(data, conn){
   if(!data || !data.type) return;
 
@@ -716,7 +709,6 @@ function connectToHost(hostId, name){
   hostConn.on("close", () => showError("Déconnecté de l'animateur."));
 }
 
-// --- EVENTS ---
 $("pick-host").addEventListener("click", () => {
   role = "host";
   $("manual-peer-container").style.display = "none";
@@ -769,7 +761,6 @@ $("copy-link-btn").addEventListener("click", () => {
   setTimeout(() => { $("copy-link-btn").textContent = "Copier le lien"; }, 2000);
 });
 
-// Contrôles Animateur
 $("btn-sharper").addEventListener("click", () => { if(state.stage < STAGES.length - 1){ state.stage++; syncState(); } });
 $("btn-reveal").addEventListener("click", () => { stopResponseTimer(); state.showAnswer = true; syncState(); });
 $("btn-next").addEventListener("click", () => {
@@ -792,7 +783,6 @@ $("btn-reset").addEventListener("click", () => {
   syncState();
 });
 
-// Contrôles Joueur
 $("btn-buzz").addEventListener("click", () => {
   if(hostConn && !state.lockedBy && !state.roundAnswered){
     hostConn.send({ type: "buzz", name: playerName });
@@ -808,7 +798,6 @@ $("btn-send-guess").addEventListener("click", () => {
 
 $("guess-input").addEventListener("keypress", (e) => { if(e.key === "Enter") $("btn-send-guess").click(); });
 
-// INIT URL
 const urlParams = new URLSearchParams(window.location.search);
 targetPeerId = urlParams.get("peer");
 
