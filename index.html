@@ -271,7 +271,7 @@
   .credit{ margin-top:8px; font-size:11px; color:var(--muted); }
   .footer-note{ margin-top:30px; font-size:12px; color:var(--muted); text-align:center; }
 </style>
-<script src="https://unpkg.com/peerjs@1/dist/peerjs.min.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -303,7 +303,7 @@
       
       <div id="manual-peer-container" style="display:none; margin-top:14px;">
         <p style="margin:0 0 6px 0; font-size:13px; font-weight:700; color:var(--maroon);">Code ID Animateur</p>
-        <input type="text" id="peer-id-input" placeholder="Collez l'ID ici">
+        <input type="text" id="peer-id-input" placeholder="Ex : ice-8421">
       </div>
 
       <div style="margin-top:16px; text-align:right;">
@@ -324,10 +324,10 @@
     <div class="share-box" id="share-box" style="display:none;">
       <div style="font-weight:700; color:var(--maroon); font-size:14px;">📢 Partager aux apprenants :</div>
       <div class="share-row">
-        <input type="text" id="share-link" readonly value="Génération du lien en cours...">
+        <input type="text" id="share-link" readonly value="Connexion au réseau en cours...">
         <button class="ghost-btn" id="copy-link-btn">Copier le lien</button>
       </div>
-      <div style="font-size:13px; font-weight:700; color:var(--coral-deep); margin-top:4px;" id="host-id-display">Code ID : en attente...</div>
+      <div style="font-size:14px; font-weight:700; color:var(--coral-deep); margin-top:4px;" id="host-id-display">Code ID : Initialisation...</div>
     </div>
 
     <div class="stage-card">
@@ -415,25 +415,41 @@ let state = {
 let hostTimerInterval = null;
 const $ = (id) => document.getElementById(id);
 
-function updateHostShareInfo(){
-  if(!myPeerId) return;
-  const baseUrl = window.location.href.split('?')[0];
-  const fullUrl = baseUrl + "?peer=" + myPeerId;
-  $("share-link").value = fullUrl;
-  $("host-id-display").textContent = "Code ID direct : " + myPeerId;
+function generateSimpleId() {
+  return "ice-" + Math.floor(1000 + Math.random() * 9000);
 }
 
-function initPeer(){
-  peer = new Peer();
+function initPeer(customId = null){
+  if(peer) peer.destroy();
+
+  const idToUse = customId || (role === "host" ? generateSimpleId() : null);
+
+  peer = new Peer(idToUse, {
+    config: {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+    },
+    debug: 1
+  });
 
   peer.on("open", (id) => {
     myPeerId = id;
-    updateHostShareInfo();
+    clearError();
+    if(role === "host"){
+      updateHostShareInfo();
+    }
   });
 
   peer.on("error", (err) => {
     console.error("PeerJS Error:", err);
-    showError("Erreur de connexion réseau (PeerJS). Veuillez rafraîchir la page.");
+    if(err.type === 'unavailable-id'){
+      initPeer(generateSimpleId());
+    } else {
+      showError("Erreur réseau PeerJS. Tentative de reconnexion...");
+      setTimeout(() => initPeer(), 2000);
+    }
   });
 
   peer.on("connection", (conn) => {
@@ -446,6 +462,14 @@ function initPeer(){
     conn.on("data", (data) => handleMessage(data, conn));
     conn.on("close", () => { conns = conns.filter(c => c !== conn); });
   });
+}
+
+function updateHostShareInfo(){
+  if(!myPeerId) return;
+  const baseUrl = window.location.href.split('?')[0];
+  const fullUrl = baseUrl + "?peer=" + myPeerId;
+  $("share-link").value = fullUrl;
+  $("host-id-display").textContent = "Code ID à transmettre : " + myPeerId;
 }
 
 const ARTICLES = ['un ', 'une ', 'le ', 'la ', 'les ', 'des ', 'du ', 'de ', "l'", 'au ', 'aux '];
@@ -692,6 +716,8 @@ function syncState(){
 
 function connectToHost(hostId, name){
   clearError();
+  if(!peer || peer.destroyed) initPeer();
+
   hostConn = peer.connect(hostId, { reliable: true });
   
   hostConn.on("open", () => {
@@ -704,13 +730,14 @@ function connectToHost(hostId, name){
     $("conn-badge").textContent = "Connecté·e";
   });
   
-  hostConn.on("error", () => showError("Impossible de se connecter à l'hôte. Vérifiez le code ID."));
+  hostConn.on("error", (e) => showError("Impossible de se connecter à l'hôte. Vérifiez le code ID."));
   hostConn.on("data", (data) => handleMessage(data, hostConn));
   hostConn.on("close", () => showError("Déconnecté de l'animateur."));
 }
 
 $("pick-host").addEventListener("click", () => {
   role = "host";
+  initPeer();
   $("manual-peer-container").style.display = "none";
   $("name-title").textContent = "Votre prénom (Animateur·rice)";
   showScreen("screen-name");
@@ -718,6 +745,7 @@ $("pick-host").addEventListener("click", () => {
 
 $("pick-player").addEventListener("click", () => {
   role = "player";
+  if(!peer) initPeer();
   if(!targetPeerId){
     $("manual-peer-container").style.display = "block";
   } else {
@@ -802,7 +830,6 @@ const urlParams = new URLSearchParams(window.location.search);
 targetPeerId = urlParams.get("peer");
 
 preloadImages();
-initPeer();
 
 if(targetPeerId){
   role = "player";
