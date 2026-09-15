@@ -415,8 +415,10 @@ const ROUNDS = [
   { file: "Wheelchair_Parts_(main_pic).JPG", answer: "Un fauteuil roulant", tie: "Le fauteuil pliant et léger tel qu'on le connaît aujourd'hui a été inventé en 1933 par Harry Jennings, pour son ami Herbert Everest, lui-même utilisateur de fauteuil roulant.", credit: "Wikimedia Commons", keywords: ["fauteuil roulant","fauteuil","chaise roulante"] },
   { file: "American_Sign_Language.jpg", answer: "Un signe de langue des signes", tie: "En France, la langue des signes française (LSF) n'a été officiellement reconnue comme une langue à part entière qu'en 2005.", credit: "Wikimedia Commons, domaine public", keywords: ["langue des signes","lsf","langage des signes","signe","geste"] },
   { file: "Blind_man_walking_with_a_long_cane.jpg", answer: "Une personne avec une canne blanche", tie: "Instituée en France dès 1931, la canne blanche reste aujourd'hui le symbole international de la déficience visuelle, bien avant le pictogramme handicap de 1968.", credit: "Wikimedia Commons, CC BY 2.0", keywords: ["canne blanche","aveugle","malvoyant","deficience visuelle","canne","non voyant"] },
-  { file: "Pictograms-nps-accessibility-braille.svg", answer: "Le symbole du braille", tie: "Le braille a été inventé en 1824 par Louis Braille — il n'avait alors que 15 ans.", credit: "Wikimedia Commons, domaine public (NPS)", keywords: ["braille","symbole braille","picto braille","pictogramme braille"] },
-  { file: "Pictograms-nps-accessibility-assistive_listening_systems.svg", answer: "Le symbole des systèmes d'aide à l'écoute", tie: "Une boucle magnétique transmet le son directement dans les appareils auditifs compatibles, sans les bruits parasites ambiants.", credit: "Wikimedia Commons, domaine public (NPS)", keywords: ["boucle magnetique","aide auditive","systeme d ecoute","malentendant","boucle induction","aide a l ecoute","appareil auditif"] }
+  { file: "IMG_0086_Braille_finger.JPG", answer: "Une main qui lit le braille", tie: "Le braille se lit du bout des doigts — un lecteur expérimenté peut atteindre environ 100 mots par minute.", credit: "Wikimedia Commons, CC0", keywords: ["braille","lecture braille","doigt braille","point braille"] },
+  { file: "Hearing_aid_20080620.jpg", answer: "L'appareil auditif", tie: "Un appareil moderne peut tenir entièrement dans le conduit de l'oreille — invisible à l'œil nu, contrairement à l'image qu'on en garde souvent.", credit: "Wikimedia Commons, domaine public", keywords: ["appareil auditif","aide auditive","appareil pour sourd","prothese auditive"] },
+  { file: "Axillary_(underarm)_crutches.JPG", answer: "Des béquilles", tie: "Les béquilles axillaires (sous les bras) servent à ne pas prendre appui sur une jambe — un usage généralement temporaire, contrairement à d'autres aides à la mobilité.", credit: "Wikimedia Commons, CC BY-SA", keywords: ["bequilles","bequille","cannes anglaises"] },
+  { file: "Letrixpower_motorised_wheelchair_(mobility_scooter)_in_Australia_02.jpg", answer: "Un fauteuil roulant électrique", tie: "Avec sa batterie, un fauteuil roulant électrique peut peser plus de 100 kg — un point important à anticiper pour l'accessibilité des transports et des locaux.", credit: "Wikimedia Commons, CC BY-SA", keywords: ["fauteuil roulant electrique","fauteuil electrique","scooter electrique","fauteuil motorise"] }
 ];
 ROUNDS.forEach(r => { r.url = FP + encodeURIComponent(r.file).replace(/%2C/g,",") + "?width=500"; });
 
@@ -723,8 +725,19 @@ $("pick-host").addEventListener("click", () => {
   }
 
   peer = new Peer();
+  let hostOpened = false;
+  const hostOpenTimeout = setTimeout(() => {
+    if(!hostOpened){
+      showError("La connexion prend trop de temps à s'établir. Votre réseau (pare-feu d'entreprise, proxy, VPN) bloque peut-être les connexions WebRTC. Essayez avec une autre connexion internet (ex. partage de connexion mobile) ou un autre navigateur, puis réessayez.");
+      try{ peer.destroy(); }catch(e){}
+      btn.classList.remove("disabled");
+      $("host-btn-label").textContent = "Je suis l'animateur·rice";
+    }
+  }, 12000);
 
   peer.on("open", (id) => {
+    hostOpened = true;
+    clearTimeout(hostOpenTimeout);
     role = "host";
     state = { round: 0, stage: 0, showAnswer: false, buzzes: {}, scores: {}, lock: null };
     $("host-controls").style.display = "flex";
@@ -792,6 +805,7 @@ $("pick-host").addEventListener("click", () => {
   });
 
   peer.on("error", (err) => {
+    clearTimeout(hostOpenTimeout);
     showError("Impossible de démarrer la partie (" + err.type + "). Vérifiez votre connexion internet, ou qu'un pare-feu/proxy ne bloque pas les connexions WebRTC, puis rechargez la page.");
     btn.classList.remove("disabled");
     $("host-btn-label").textContent = "Je suis l'animateur·rice";
@@ -828,8 +842,19 @@ $("join-btn").addEventListener("click", () => {
   }
 
   peer = new Peer();
+  let playerOpened = false;
+  const playerOpenTimeout = setTimeout(() => {
+    if(!playerOpened){
+      showError("La connexion prend trop de temps à s'établir. Votre réseau (pare-feu, proxy, VPN) bloque peut-être les connexions WebRTC. Essayez avec une autre connexion internet (ex. partage de connexion mobile) ou un autre navigateur, puis réessayez.");
+      try{ peer.destroy(); }catch(e){}
+      btn.disabled = false;
+      btn.textContent = "Rejoindre la partie";
+    }
+  }, 12000);
 
   peer.on("open", () => {
+    playerOpened = true;
+    clearTimeout(playerOpenTimeout);
     hostConn = peer.connect(hostId, { reliable: true });
 
     hostConn.on("open", () => {
@@ -865,6 +890,7 @@ $("join-btn").addEventListener("click", () => {
   });
 
   peer.on("error", (err) => {
+    clearTimeout(playerOpenTimeout);
     let extra = "";
     if(err.type === "peer-unavailable") extra = " L'animateur·rice n'est peut-être pas (ou plus) connecté·e.";
     showError("Impossible de rejoindre la partie (" + err.type + ")." + extra);
