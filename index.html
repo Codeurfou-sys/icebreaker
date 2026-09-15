@@ -224,9 +224,11 @@
     font-weight:800;
     cursor:pointer;
     box-shadow:0 4px 0 #5B231D;
+    transition: background .2s, transform .1s;
   }
   .buzz-btn:active{ transform:translateY(3px); box-shadow:0 1px 0 #5B231D; }
   .buzz-btn:disabled{ background:#D8C7BE; box-shadow:none; cursor:not-allowed; }
+  
   .guess-row{
     display:flex;
     gap:8px;
@@ -234,9 +236,10 @@
     max-width:360px;
   }
   .status-line{
-    font-size:13px;
-    color:var(--muted);
-    min-height:18px;
+    font-size:14px;
+    font-weight:700;
+    color:var(--maroon);
+    min-height:20px;
   }
 
   .feed{
@@ -355,8 +358,12 @@
   <!-- NAME SCREEN -->
   <div id="screen-name" class="screen">
     <div class="stage-card" style="text-align:left; max-width:420px; margin:0 auto;">
-      <p style="margin-top:0; font-weight:700; color:var(--maroon);">Votre prénom</p>
+      <p style="margin-top:0; font-weight:700; color:var(--maroon);" id="name-title">Votre prénom</p>
       <input type="text" id="name-input" placeholder="Ex : Camille" maxlength="24">
+      <div id="manual-peer-container" style="display:none; margin-top:12px;">
+        <p style="margin:0 0 6px 0; font-size:13px; font-weight:700; color:var(--maroon);">ID Animateur (si non inclus dans le lien)</p>
+        <input type="text" id="peer-id-input" placeholder="Ex: abc-123">
+      </div>
       <div style="margin-top:16px; text-align:right;">
         <button class="primary-btn" id="join-btn">Rejoindre la partie</button>
       </div>
@@ -368,7 +375,7 @@
     <div class="top-bar">
       <span class="badge" id="round-badge">Manche 1/10</span>
       <span class="conn-badge" id="conn-badge" style="display:none;"></span>
-      <button class="ghost-btn" id="leave-btn">Changer de rôle</button>
+      <button class="ghost-btn" id="leave-btn">Quitter / Changer de rôle</button>
     </div>
 
     <div class="share-box" id="share-box" style="display:none;">
@@ -418,7 +425,7 @@
     </div>
   </div>
 
-  <p class="footer-note">Cet outil connecte les navigateurs directement entre eux (technologie WebRTC, via la bibliothèque libre PeerJS) — aucune donnée n'est stockée sur un serveur, aucune inscription, aucune donnée personnelle autre que le prénom que vous tapez.</p>
+  <p class="footer-note">Cet outil connecte les navigateurs directement entre eux (technologie WebRTC, via PeerJS) — aucune inscription requise.</p>
 </div>
 
 <script>
@@ -426,22 +433,9 @@
 // CONFIGURATION
 // ============================================
 
-const FP = "https://commons.wikimedia.org/wiki/Special:FilePath/";
-function roundUrl(r){
-  if (r.dataUri) return r.dataUri;
-  if (r.url) return r.url;
-  if (r.file && r.file.startsWith('http')) return r.file;
-  return FP + encodeURIComponent(r.file).replace(/%2C/g,",") + "?width=500";
-}
-
 const STAGES = [46, 26, 14, 7, 1];
-
-// ============================================
-// ROUNDS - Tableau complet avec 10 images
-// Utilise les URLs directes vers ton dépôt GitHub
-// ============================================
-
 const GITHUB_BASE = "https://codeurfou-sys.github.io/icebreaker/";
+const RESPONSE_TIME_LIMIT = 10; // Temps limite pour répondre en secondes
 
 const ROUNDS = [
   {
@@ -459,10 +453,10 @@ const ROUNDS = [
     keywords: ["canne", "canne blanche", "canne pour aveugle", "canne pour malvoyant"]
   },
   {
-    file: GITHUB_BASE + "D%C3%A9ficients%20visuels-CMJN.webp.webp",
+    file: GITHUB_BASE + "deficience-visuelle.jpg",
     answer: "Symbole déficience visuelle",
     tie: "Ce pictogramme représente les troubles de la vision et l'accessibilité pour les personnes malvoyantes.",
-    credit: "Wikimedia Commons",
+    credit: "Photo libre de droits",
     keywords: ["symbole déficience visuelle", "déficience visuelle", "pictogramme aveugle", "pictogramme malvoyant", "symbole malvoyant"]
   },
   {
@@ -473,10 +467,10 @@ const ROUNDS = [
     keywords: ["fauteuil roulant", "fauteuil", "chaise roulante"]
   },
   {
-    file: GITHUB_BASE + "D%C3%A9ficients-auditifs-CMJN-10x10-cm.webp.webp",
+    file: GITHUB_BASE + "deficience-auditive.jpg",
     answer: "Déficience auditive",
     tie: "Ce symbole représente les troubles de l'audition et l'accessibilité pour les personnes sourdes ou malentendantes.",
-    credit: "Wikimedia Commons",
+    credit: "Photo libre de droits",
     keywords: ["déficience auditive", "pictogramme surdité", "symbole mal entendant", "mal entendant", "sourd", "symbole sourd", "problème auditif"]
   },
   {
@@ -525,96 +519,40 @@ let playerName = "";
 let peer = null;
 let conns = [];
 let hostConn = null;
+let targetPeerId = null;
+
 let state = {
   round: 0,
   stage: 0,
   showAnswer: false,
-  buzzes: {},
   scores: {},
-  lock: null,
+  lockedBy: null, // Verrou de buzz
   roundAnswered: false,
-  roundAnsweredBy: null
+  roundAnsweredBy: null,
+  feed: [],
+  timerSeconds: 0 // Compte à rebours dynamique
 };
-let lastFeedStamp = "";
-let lastLockKey = "";
-let lockTimer = null;
-let countdownTimer = null;
 
-// ============================================
-// UTILITAIRES
-// ============================================
+let hostTimerInterval = null; // Intervalle géré côté hôte
 
 const $ = (id) => document.getElementById(id);
 
-// Articles à supprimer pour la validation
-const ARTICLES = ['un ', 'une ', 'le ', 'la ', 'les ', 'des ', 'du ', 'de ', "l'", 'au ', 'aux '];
-
-// Normalisation améliorée
-function normalizeStr(s){
-  if(!s) return "";
-  let str = s
-    .toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9 ]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  
-  // Supprimer les articles au début et à la fin
-  for(const article of ARTICLES){
-    while(str.startsWith(article)){
-      str = str.substring(article.length).trim();
-    }
-    while(str.endsWith(article.trim())){
-      str = str.substring(0, str.length - article.trim().length).trim();
-    }
-  }
-  return str.trim();
-}
-
-// Vérification avec pluriels et variantes
-function isCorrectAnswer(guess, keywords){
-  const g = normalizeStr(guess);
-  if(!g) return false;
-  
-  return keywords.some(k => {
-    const nk = normalizeStr(k);
-    if(!nk) return false;
-    
-    // Vérifier si la réponse contient le keyword ou vice versa
-    if(g === nk) return true;
-    if(g.includes(nk)) return true;
-    if(nk.includes(g)) return true;
-    
-    // Vérifier avec les pluriels
-    const keywordVariants = [nk];
-    if(!nk.endsWith('s')) keywordVariants.push(nk + 's');
-    if(!nk.endsWith('x')) keywordVariants.push(nk + 'x');
-    if(!nk.endsWith('es')) keywordVariants.push(nk + 'es');
-    if(!nk.endsWith('aux')) keywordVariants.push(nk + 'aux');
-    
-    const guessVariants = [g];
-    if(!g.endsWith('s')) guessVariants.push(g + 's');
-    if(!g.endsWith('x')) guessVariants.push(g + 'x');
-    if(!g.endsWith('es')) guessVariants.push(g + 'es');
-    if(!g.endsWith('aux')) guessVariants.push(g + 'aux');
-    
-    for(const kv of keywordVariants){
-      for(const gv of guessVariants){
-        if(gv === kv) return true;
-        if(gv.includes(kv)) return true;
-        if(kv.includes(gv)) return true;
-      }
-    }
-    
-    return false;
-  });
-}
-
-// Buzz sound
+// ============================================
+// AUDIO BUZZER
+// ============================================
 let audioCtx = null;
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+}
+
 function playBuzzSound(){
   try{
-    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    initAudio();
     const now = audioCtx.currentTime;
     [880, 660].forEach((freq, i) => {
       const osc = audioCtx.createOscillator();
@@ -628,22 +566,115 @@ function playBuzzSound(){
       osc.start(now + i*0.13);
       osc.stop(now + i*0.13 + 0.24);
     });
-  }catch(e){}
+  }catch(e){
+    console.log("Erreur audio", e);
+  }
 }
 
-// Image preloading
-const imgCache = {};
-function preloadImages(){
-  ROUNDS.forEach((r, idx) => {
-    const entry = { status: "loading", img: null };
-    imgCache[idx] = entry;
-    const im = new Image();
-    im.onload = () => { entry.status = "loaded"; entry.img = im; render(); };
-    im.onerror = () => { entry.status = "error"; render(); };
-    im.src = roundUrl(r);
-    im.crossOrigin = "anonymous";
+// ============================================
+// NORMALISATION DE TEXTE
+// ============================================
+const ARTICLES = ['un ', 'une ', 'le ', 'la ', 'les ', 'des ', 'du ', 'de ', "l'", 'au ', 'aux '];
+
+function normalizeStr(s){
+  if(!s) return "";
+  let str = s.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  
+  for(const article of ARTICLES){
+    if(str.startsWith(article)){
+      str = str.substring(article.length).trim();
+    }
+  }
+  return str.trim();
+}
+
+function isCorrectAnswer(guess, keywords){
+  const g = normalizeStr(guess);
+  if(!g) return false;
+  
+  return keywords.some(k => {
+    const nk = normalizeStr(k);
+    if(!nk) return false;
+    return g === nk || g.includes(nk) || nk.includes(g);
   });
 }
+
+// ============================================
+// GESTION ET PRÉCHARGEMENT DES IMAGES
+// ============================================
+const imgCache = {};
+
+function preloadImages(){
+  ROUNDS.forEach((r, idx) => {
+    if(!imgCache[idx]){
+      const entry = { status: "loading", img: null };
+      imgCache[idx] = entry;
+      const im = new Image();
+      im.crossOrigin = "anonymous";
+      im.onload = () => { entry.status = "loaded"; entry.img = im; render(); };
+      im.onerror = () => { entry.status = "error"; render(); };
+      im.src = r.file;
+    }
+  });
+}
+
+function drawPixelated(canvas, roundIdx, blockSize){
+  const size = 280;
+  const ctx = canvas.getContext("2d");
+  const entry = imgCache[roundIdx];
+  ctx.clearRect(0,0,size,size);
+  
+  if(!entry || entry.status === "loading"){
+    ctx.fillStyle = "#EFE3D6";
+    ctx.fillRect(0,0,size,size);
+    ctx.fillStyle = "#8A736C";
+    ctx.font = "16px Calibri";
+    ctx.textAlign = "center";
+    ctx.fillText("Chargement...", size/2, size/2);
+    return;
+  }
+  if(entry.status === "error"){
+    ctx.fillStyle = "#EFE3D6";
+    ctx.fillRect(0,0,size,size);
+    ctx.fillStyle = "#8A736C";
+    ctx.font = "15px Calibri";
+    ctx.textAlign = "center";
+    ctx.fillText("🖼️ Image non disponible", size/2, size/2);
+    return;
+  }
+
+  const img = entry.img;
+  const src = document.createElement("canvas");
+  src.width = size; src.height = size;
+  const sctx = src.getContext("2d");
+  const scale = Math.max(size/img.naturalWidth, size/img.naturalHeight);
+  const w = img.naturalWidth*scale, h = img.naturalHeight*scale;
+  sctx.drawImage(img, (size-w)/2, (size-h)/2, w, h);
+
+  if(blockSize <= 1){
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(src, 0, 0);
+    return;
+  }
+
+  const tw = Math.max(1, Math.round(size/blockSize));
+  const tiny = document.createElement("canvas");
+  tiny.width = tw; tiny.height = tw;
+  const tctx = tiny.getContext("2d");
+  tctx.imageSmoothingEnabled = true;
+  tctx.drawImage(src, 0, 0, tw, tw);
+
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(tiny, 0, 0, tw, tw, 0, 0, size, size);
+}
+
+// ============================================
+// RENDU DU JEU & INTERFACE
+// ============================================
 
 function showScreen(id){
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
@@ -661,67 +692,9 @@ function clearError(){
 
 function showCorrectAnswerBanner(playerName, answerText){
   const banner = $("correct-banner");
-  banner.textContent = "✅ Bonne réponse ! " + escapeHtml(playerName) + " a trouvé : " + escapeHtml(answerText);
+  banner.textContent = "✅ Bonne réponse ! " + playerName + " a trouvé : " + answerText;
   banner.classList.add("show");
   setTimeout(() => banner.classList.remove("show"), 5000);
-}
-
-// ============================================
-// RENDU
-// ============================================
-
-function escapeHtml(s){
-  const d = document.createElement("div");
-  d.textContent = s;
-  return d.innerHTML;
-}
-
-function drawPixelated(canvas, roundIdx, blockSize){
-  const size = 280;
-  const ctx = canvas.getContext("2d");
-  const round = ROUNDS[roundIdx];
-  const entry = imgCache[roundIdx];
-  ctx.clearRect(0,0,size,size);
-  
-  if(!entry || entry.status === "loading"){
-    ctx.fillStyle = "#EFE3D6";
-    ctx.fillRect(0,0,size,size);
-    ctx.fillStyle = "#8A736C";
-    ctx.font = "16px Calibri";
-    ctx.textAlign = "center";
-    ctx.fillText("Chargement de l'image...", size/2, size/2);
-    return;
-  }
-  if(entry.status === "error"){
-    ctx.fillStyle = "#EFE3D6";
-    ctx.fillRect(0,0,size,size);
-    ctx.fillStyle = "#8A736C";
-    ctx.font = "15px Calibri";
-    ctx.textAlign = "center";
-    ctx.fillText("🖼️ Image indisponible", size/2, size/2 - 8);
-    ctx.fillText("(passez à la manche suivante)", size/2, size/2 + 14);
-    return;
-  }
-  const img = entry.img;
-  const src = document.createElement("canvas");
-  src.width = size; src.height = size;
-  const sctx = src.getContext("2d");
-  const scale = Math.max(size/img.naturalWidth, size/img.naturalHeight);
-  const w = img.naturalWidth*scale, h = img.naturalHeight*scale;
-  sctx.drawImage(img, (size-w)/2, (size-h)/2, w, h);
-  if(blockSize <= 1){
-    ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(src, 0, 0);
-    return;
-  }
-  const tw = Math.max(1, Math.round(size/blockSize));
-  const tiny = document.createElement("canvas");
-  tiny.width = tw; tiny.height = tw;
-  const tctx = tiny.getContext("2d");
-  tctx.imageSmoothingEnabled = true;
-  tctx.drawImage(src, 0, 0, tw, tw);
-  ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(tiny, 0, 0, tw, tw, 0, 0, size, size);
 }
 
 function render(){
@@ -729,36 +702,57 @@ function render(){
   const blockSize = STAGES[state.stage] || 1;
   drawPixelated(canvas, state.round, blockSize);
   
-  // Mettre à jour le badge de manche
   $("round-badge").textContent = "Manche " + (state.round + 1) + "/" + ROUNDS.length;
   
-  // Mettre à jour le crédit de l'image
   const round = ROUNDS[state.round];
   if(round && round.credit){
     $("img-credit").textContent = "Image : " + round.credit;
   }
   
-  // Afficher ou masquer la réponse
   const answerBox = $("answer-box");
-  const answerTitle = $("answer-title");
-  const answerTie = $("answer-tie");
-  
   if(state.showAnswer && round){
-    answerTitle.textContent = round.answer;
-    answerTie.textContent = round.tie;
+    $("answer-title").textContent = round.answer;
+    $("answer-tie").textContent = round.tie;
     answerBox.classList.add("show");
   } else {
     answerBox.classList.remove("show");
   }
   
-  // Mettre à jour les contrôles de l'animateur
+  // Rendu Hôte
   if(role === "host"){
     const lockStatus = $("host-lock-status");
-    if(state.lock){
+    if(state.lockedBy){
       lockStatus.style.display = "block";
-      lockStatus.textContent = "✅ Manche verrouillée - " + state.lock;
+      lockStatus.textContent = "🔒 Buzz par : " + state.lockedBy + " (Temps : " + state.timerSeconds + "s)";
     } else {
       lockStatus.style.display = "none";
+    }
+  }
+
+  // Rendu Joueur
+  if(role === "player"){
+    const buzzBtn = $("btn-buzz");
+    const guessRow = $("guess-row");
+    const playerStatus = $("player-status");
+
+    if(state.roundAnswered){
+      buzzBtn.disabled = true;
+      guessRow.style.display = "none";
+      playerStatus.textContent = "Manche terminée ! " + (state.roundAnsweredBy || "") + " a trouvé.";
+    } else if(state.lockedBy) {
+      if(state.lockedBy === playerName){
+        buzzBtn.disabled = true;
+        guessRow.style.display = "flex";
+        playerStatus.textContent = "⏱️ Temps restant pour répondre : " + state.timerSeconds + "s";
+      } else {
+        buzzBtn.disabled = true;
+        guessRow.style.display = "none";
+        playerStatus.textContent = "🔒 " + state.lockedBy + " a buzzé (" + state.timerSeconds + "s)...";
+      }
+    } else {
+      buzzBtn.disabled = false;
+      guessRow.style.display = "none";
+      playerStatus.textContent = "Main sur le buzzer !";
     }
   }
 }
@@ -781,7 +775,7 @@ function updateFeed(){
 
 function updateLeaderboard(){
   const list = $("leaderboard-list");
-  const scores = state.scores;
+  const scores = state.scores || {};
   const entries = Object.entries(scores).sort((a, b) => b[1] - a[1]);
   
   if(entries.length === 0){
@@ -794,273 +788,148 @@ function updateLeaderboard(){
   }).join("");
 }
 
-// ============================================
-// GESTION DES MESSAGES
-// ============================================
+function escapeHtml(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
 
 function addFeedItem(name, text, isCorrect = false){
-  const timestamp = Date.now();
   state.feed = state.feed || [];
-  state.feed.push({ name, text, timestamp, correct: isCorrect });
-  
-  if(state.feed.length > 20){
-    state.feed = state.feed.slice(-20);
-  }
-  
+  state.feed.unshift({ name, text, correct: isCorrect });
+  if(state.feed.length > 15) state.feed.pop();
   updateFeed();
+}
+
+// ============================================
+// CHRONOMÈTRE (GESTION PAR L'HÔTE)
+// ============================================
+
+function startResponseTimer(){
+  clearInterval(hostTimerInterval);
+  state.timerSeconds = RESPONSE_TIME_LIMIT;
   
-  if(isCorrect){
-    const round = ROUNDS[state.round];
-    if(round){
-      showCorrectAnswerBanner(name, round.answer);
+  hostTimerInterval = setInterval(() => {
+    state.timerSeconds--;
+    if(state.timerSeconds <= 0){
+      clearInterval(hostTimerInterval);
+      if(state.lockedBy){
+        addFeedItem(state.lockedBy, "⏳ Temps écoulé !");
+        state.lockedBy = null; // Déverrouillage automatique
+        syncState();
+      }
+    } else {
+      syncState();
     }
-  }
+  }, 1000);
 }
 
-function handleMessage(msg, conn){
-  if(!msg || !msg.type) return;
-  
-  switch(msg.type){
-    case "buzz":
-      state.buzzes[msg.name] = msg.timestamp || Date.now();
-      addFeedItem(msg.name, "a buzzé !");
-      if(role === "host"){
-        playBuzzSound();
-      }
-      break;
-      
-    case "guess":
-      if(state.roundAnswered) break;
-      
-      const round = ROUNDS[state.round];
-      if(round && isCorrectAnswer(msg.guess, round.keywords)){
-        state.roundAnswered = true;
-        state.roundAnsweredBy = msg.name;
-        
-        state.scores[msg.name] = (state.scores[msg.name] || 0) + 1;
-        
-        state.showAnswer = true;
-        
-        addFeedItem(msg.name, "a trouvé ! 🎉", true);
-        
-        broadcast({
-          type: "round_answered",
-          name: msg.name,
-          round: state.round,
-          answer: round.answer
-        });
-        
-        if(role === "player"){
-          $("btn-buzz").disabled = true;
-          $("guess-input").disabled = true;
-          $("btn-send-guess").disabled = true;
-          $("player-status").textContent = "Réponse déjà trouvée !";
-        }
-        
-        render();
-        updateLeaderboard();
-      } else {
-        addFeedItem(msg.name, "a proposé : " + msg.guess);
-      }
-      break;
-      
-    case "round_answered":
-      state.roundAnswered = true;
-      state.roundAnsweredBy = msg.name;
-      state.showAnswer = true;
-      
-      if(role === "player"){
-        $("btn-buzz").disabled = true;
-        $("guess-input").disabled = true;
-        $("btn-send-guess").disabled = true;
-        $("player-status").textContent = "Réponse déjà trouvée par " + msg.name + " !";
-      }
-      
-      if(msg.answer){
-        showCorrectAnswerBanner(msg.name, msg.answer);
-      }
-      
-      render();
-      break;
-      
-    case "next_round":
-      nextRound();
-      break;
-      
-    case "sharper":
-      if(state.stage < STAGES.length - 1) state.stage++;
-      render();
-      break;
-      
-    case "reveal":
-      state.showAnswer = true;
-      render();
-      break;
-      
-    case "reset":
-      resetGame();
-      break;
-      
-    case "lock":
-      state.lock = msg.lock;
-      lastLockKey = msg.key;
-      render();
-      break;
-      
-    case "join":
-      if(role === "host"){
-        state.scores[msg.name] = state.scores[msg.name] || 0;
-        updateLeaderboard();
-        
-        conn.send({
-          type: "state",
-          round: state.round,
-          stage: state.stage,
-          showAnswer: state.showAnswer,
-          roundAnswered: state.roundAnswered,
-          scores: state.scores
-        });
-      }
-      break;
-      
-    case "state":
-      if(role === "player"){
-        state.round = msg.round || 0;
-        state.stage = msg.stage || 0;
-        state.showAnswer = msg.showAnswer || false;
-        state.roundAnswered = msg.roundAnswered || false;
-        state.scores = msg.scores || {};
-        
-        if(state.roundAnswered){
-          $("btn-buzz").disabled = true;
-          $("guess-input").disabled = true;
-          $("btn-send-guess").disabled = true;
-          $("player-status").textContent = "Réponse déjà trouvée !";
-        }
-        
-        render();
-        updateLeaderboard();
-      }
-      break;
-  }
-}
-
-function broadcast(msg){
-  if(role === "host"){
-    conns.forEach(c => {
-      try { c.send(msg); } catch(e) {}
-    });
-  } else if(hostConn){
-    try { hostConn.send(msg); } catch(e) {}
-  }
+function stopResponseTimer(){
+  clearInterval(hostTimerInterval);
+  state.timerSeconds = 0;
 }
 
 // ============================================
-// GESTION DU JEU
-// ============================================
-
-function nextRound(){
-  state.round = (state.round + 1) % ROUNDS.length;
-  state.stage = 0;
-  state.showAnswer = false;
-  state.roundAnswered = false;
-  state.roundAnsweredBy = null;
-  state.feed = [];
-  
-  if(role === "player"){
-    $("btn-buzz").disabled = false;
-    $("guess-input").disabled = false;
-    $("btn-send-guess").disabled = false;
-    $("guess-input").value = "";
-    $("player-status").textContent = "";
-    $("guess-row").style.display = "none";
-  }
-  
-  render();
-  updateFeed();
-  
-  broadcast({ type: "next_round" });
-}
-
-function sharperImage(){
-  if(state.stage < STAGES.length - 1) state.stage++;
-  render();
-  broadcast({ type: "sharper" });
-}
-
-function revealAnswer(){
-  state.showAnswer = true;
-  render();
-  broadcast({ type: "reveal" });
-}
-
-function resetGame(){
-  state.round = 0;
-  state.stage = 0;
-  state.showAnswer = false;
-  state.roundAnswered = false;
-  state.roundAnsweredBy = null;
-  state.feed = [];
-  state.scores = {};
-  state.buzzes = {};
-  
-  render();
-  updateFeed();
-  updateLeaderboard();
-  
-  broadcast({ type: "reset" });
-}
-
-// ============================================
-// PEERJS - CONNEXIONS
+// GESTION RÉSEAU PEERJS
 // ============================================
 
 function initPeer(){
   peer = new Peer();
   
   peer.on("open", (id) => {
-    console.log("PeerJS connecté avec ID :", id);
-    $("share-link").value = location.origin + location.pathname + "?peer=" + id;
+    if(role === "host"){
+      $("share-link").value = window.location.href.split('?')[0] + "?peer=" + id;
+    }
   });
   
   peer.on("error", (err) => {
-    console.error("PeerJS error:", err);
-    showError("Erreur de connexion PeerJS. Vérifiez votre connexion internet.");
+    console.error("PeerJS Error:", err);
+    showError("Erreur réseau PeerJS. Veuillez réactualiser.");
   });
-  
+
   peer.on("connection", (conn) => {
     conn.on("open", () => {
       conns.push(conn);
       if(role === "host"){
-        conn.send({ type: "role", role: "host" });
-        conn.send({
-          type: "state",
-          round: state.round,
-          stage: state.stage,
-          showAnswer: state.showAnswer,
-          roundAnswered: state.roundAnswered,
-          scores: state.scores
-        });
+        conn.send({ type: "sync", state: state });
       }
     });
-    
     conn.on("data", (data) => handleMessage(data, conn));
-    conn.on("close", () => {
-      conns = conns.filter(c => c !== conn);
-    });
-    conn.on("error", (err) => {
-      console.error("Connection error:", err);
-      conns = conns.filter(c => c !== conn);
-    });
+    conn.on("close", () => { conns = conns.filter(c => c !== conn); });
   });
 }
 
-function connectToHost(peerId, name){
+function handleMessage(data, conn){
+  if(!data || !data.type) return;
+
+  if(role === "host"){
+    // L'HÔTE REÇOIT DES ACTIONS DES JOUEURS
+    switch(data.type){
+      case "join":
+        state.scores[data.name] = state.scores[data.name] || 0;
+        addFeedItem(data.name, "a rejoint la partie.");
+        syncState();
+        break;
+
+      case "buzz":
+        if(!state.lockedBy && !state.roundAnswered){
+          state.lockedBy = data.name;
+          playBuzzSound();
+          addFeedItem(data.name, "a buzzé !");
+          startResponseTimer(); // Démarrage du compte à rebours de 10s
+          syncState();
+        }
+        break;
+
+      case "guess":
+        if(state.lockedBy === data.name && !state.roundAnswered){
+          stopResponseTimer(); // Arrêt du chrono
+          const round = ROUNDS[state.round];
+          if(round && isCorrectAnswer(data.guess, round.keywords)){
+            state.roundAnswered = true;
+            state.roundAnsweredBy = data.name;
+            state.showAnswer = true;
+            state.scores[data.name] = (state.scores[data.name] || 0) + 1;
+            addFeedItem(data.name, "a trouvé : " + round.answer + " ! 🎉", true);
+            showCorrectAnswerBanner(data.name, round.answer);
+          } else {
+            addFeedItem(data.name, "a proposé : '" + data.guess + "' (Incorrect)");
+          }
+          state.lockedBy = null; // Libération du verrou
+          syncState();
+        }
+        break;
+    }
+  } else {
+    // LE JOUEUR REÇOIT L'ÉTAT SYNCHRONISÉ
+    switch(data.type){
+      case "sync":
+        const oldLock = state.lockedBy;
+        state = data.state;
+        if(state.lockedBy && state.lockedBy !== oldLock){
+          playBuzzSound();
+          if(state.lockedBy === playerName){
+            setTimeout(() => { $("guess-input").focus(); }, 100);
+          }
+        }
+        render();
+        updateFeed();
+        updateLeaderboard();
+        break;
+    }
+  }
+}
+
+function syncState(){
+  render();
+  updateFeed();
+  updateLeaderboard();
+  conns.forEach(c => {
+    try { c.send({ type: "sync", state: state }); } catch(e){}
+  });
+}
+
+function connectToHost(hostId, name){
   clearError();
-  $("host-btn-label").textContent = "Connexion en cours...";
-  $("pick-host").classList.add("disabled");
-  
-  hostConn = peer.connect(peerId, { reliable: true });
+  hostConn = peer.connect(hostId, { reliable: true });
   
   hostConn.on("open", () => {
     hostConn.send({ type: "join", name: name });
@@ -1070,199 +939,153 @@ function connectToHost(peerId, name){
     $("share-box").style.display = "none";
     $("conn-badge").style.display = "inline-block";
     $("conn-badge").textContent = "Connecté·e";
-    
-    state.round = 0;
-    state.stage = 0;
-    state.showAnswer = false;
-    state.roundAnswered = false;
-    state.scores = {};
-    state.feed = [];
-    
-    render();
   });
   
   hostConn.on("error", (err) => {
-    showError("Impossible de se connecter à l'animateur. Vérifiez l'ID.");
-    $("pick-host").classList.remove("disabled");
-    $("host-btn-label").textContent = "Je suis l'animateur·rice";
+    showError("Impossible de se connecter à l'hôte. Vérifiez le lien ou l'ID.");
   });
   
-  hostConn.on("data", (data) => handleMessage(data));
+  hostConn.on("data", (data) => handleMessage(data, hostConn));
   hostConn.on("close", () => {
-    showError("Déconnecté·e de l'animateur.");
-    showScreen("screen-role");
-    $("pick-host").classList.remove("disabled");
-    $("host-btn-label").textContent = "Je suis l'animateur·rice";
+    showError("Déconnecté de l'animateur.");
   });
-}
-
-function becomeHost(name){
-  role = "host";
-  playerName = name;
-  
-  showScreen("screen-game");
-  $("host-controls").style.display = "flex";
-  $("player-controls").style.display = "none";
-  $("share-box").style.display = "flex";
-  $("conn-badge").style.display = "none";
-  $("round-badge").textContent = "Manche 1/" + ROUNDS.length;
-  
-  state.round = 0;
-  state.stage = 0;
-  state.showAnswer = false;
-  state.roundAnswered = false;
-  state.scores = {};
-  state.feed = [];
-  state.scores[name] = 0;
-  
-  render();
-  updateLeaderboard();
-  
-  preloadImages();
 }
 
 // ============================================
-// ÉCOUTEURS D'ÉVÉNEMENTS
+// BOUTONS & ÉVÉNEMENTS
 // ============================================
 
 $("pick-host").addEventListener("click", () => {
-  showScreen("screen-name");
   role = "host";
+  $("manual-peer-container").style.display = "none";
+  $("name-title").textContent = "Votre prénom (Animateur·rice)";
+  showScreen("screen-name");
 });
 
 $("pick-player").addEventListener("click", () => {
-  showScreen("screen-name");
   role = "player";
+  if(!targetPeerId){
+    $("manual-peer-container").style.display = "block";
+  }
+  $("name-title").textContent = "Votre prénom (Participant·e)";
+  showScreen("screen-name");
 });
 
 $("join-btn").addEventListener("click", () => {
+  initAudio();
   const name = $("name-input").value.trim();
   if(!name || name.length < 2){
     showError("Veuillez entrer un prénom valide.");
     return;
   }
-  
   playerName = name;
   clearError();
-  
+
   if(role === "host"){
-    becomeHost(name);
+    showScreen("screen-game");
+    $("host-controls").style.display = "flex";
+    $("player-controls").style.display = "none";
+    $("share-box").style.display = "flex";
+    state.scores[name] = 0;
+    syncState();
   } else {
-    const peerId = prompt("Entrez l'ID de l'animateur (ou laissez vide pour créer une nouvelle partie) :");
-    if(peerId && peerId.trim()){
-      connectToHost(peerId.trim(), name);
-    } else {
-      becomeHost(name);
-      role = "host";
+    const peerToConnect = targetPeerId || $("peer-id-input").value.trim();
+    if(!peerToConnect){
+      showError("ID d'hôte manquant. Veuillez utiliser le lien fourni par l'animateur.");
+      return;
     }
+    connectToHost(peerToConnect, name);
   }
 });
 
 $("leave-btn").addEventListener("click", () => {
-  if(role === "host"){
-    conns.forEach(c => c.close());
-    conns = [];
-  } else {
-    if(hostConn) hostConn.close();
-    hostConn = null;
-  }
-  
-  peer.destroy();
-  setTimeout(() => {
-    location.reload();
-  }, 500);
+  location.href = window.location.pathname;
 });
 
 $("copy-link-btn").addEventListener("click", () => {
   const input = $("share-link");
   input.select();
   document.execCommand("copy");
-  const originalText = $("copy-link-btn").textContent;
   $("copy-link-btn").textContent = "Copié !";
-  setTimeout(() => {
-    $("copy-link-btn").textContent = originalText;
-  }, 2000);
+  setTimeout(() => { $("copy-link-btn").textContent = "Copier"; }, 2000);
 });
 
-// Contrôles de l'animateur
-$("btn-sharper").addEventListener("click", sharperImage);
-$("btn-reveal").addEventListener("click", revealAnswer);
-$("btn-next").addEventListener("click", nextRound);
-$("btn-reset").addEventListener("click", resetGame);
+// Contrôles Animateur
+$("btn-sharper").addEventListener("click", () => {
+  if(state.stage < STAGES.length - 1){
+    state.stage++;
+    syncState();
+  }
+});
 
-// Contrôles du joueur
+$("btn-reveal").addEventListener("click", () => {
+  stopResponseTimer();
+  state.showAnswer = true;
+  syncState();
+});
+
+$("btn-next").addEventListener("click", () => {
+  stopResponseTimer();
+  state.round = (state.round + 1) % ROUNDS.length;
+  state.stage = 0;
+  state.showAnswer = false;
+  state.roundAnswered = false;
+  state.roundAnsweredBy = null;
+  state.lockedBy = null;
+  state.feed = [];
+  syncState();
+});
+
+$("btn-reset").addEventListener("click", () => {
+  stopResponseTimer();
+  state.round = 0;
+  state.stage = 0;
+  state.showAnswer = false;
+  state.roundAnswered = false;
+  state.roundAnsweredBy = null;
+  state.lockedBy = null;
+  state.feed = [];
+  state.scores = {};
+  if(role === "host") state.scores[playerName] = 0;
+  syncState();
+});
+
+// Contrôles Joueur
 $("btn-buzz").addEventListener("click", () => {
-  if(state.roundAnswered) return;
-  
-  playBuzzSound();
-  $("guess-row").style.display = "flex";
-  $("guess-input").focus();
-  $("player-status").textContent = "Buzz ! À vous de répondre.";
-  
-  broadcast({ type: "buzz", name: playerName, timestamp: Date.now() });
+  initAudio();
+  if(hostConn && !state.lockedBy && !state.roundAnswered){
+    hostConn.send({ type: "buzz", name: playerName });
+  }
 });
 
 $("btn-send-guess").addEventListener("click", () => {
-  if(state.roundAnswered) return;
-  
   const guess = $("guess-input").value.trim();
   if(!guess) return;
-  
   $("guess-input").value = "";
-  $("guess-row").style.display = "none";
-  $("player-status").textContent = "Réponse envoyée.";
-  
-  broadcast({ type: "guess", name: playerName, guess: guess, round: state.round });
+  if(hostConn){
+    hostConn.send({ type: "guess", name: playerName, guess: guess });
+  }
 });
 
 $("guess-input").addEventListener("keypress", (e) => {
-  if(e.key === "Enter"){
-    $("btn-send-guess").click();
-  }
+  if(e.key === "Enter") $("btn-send-guess").click();
 });
 
 // ============================================
 // INITIALISATION
 // ============================================
 
-// Charger les paramètres de l'URL
 const urlParams = new URLSearchParams(window.location.search);
-const peerId = urlParams.get("peer");
+targetPeerId = urlParams.get("peer");
 
-// Initialiser PeerJS
+preloadImages();
 initPeer();
 
-// Si un ID est présent dans l'URL, se connecter automatiquement
-if(peerId && role !== "host"){
+if(targetPeerId){
   role = "player";
+  $("manual-peer-container").style.display = "none";
   showScreen("screen-name");
 }
-
-// Pré-charger les images
-preloadImages();
-
-// Gérer le retour en arrière
-window.addEventListener("popstate", () => {
-  if(role !== null){
-    if(confirm("Voulez-vous quitter la partie ?")){
-      if(role === "host"){
-        conns.forEach(c => c.close());
-      } else if(hostConn){
-        hostConn.close();
-      }
-      peer.destroy();
-    } else {
-      history.pushState(null, null, window.location.href);
-    }
-  }
-});
-
-// Empêcher le rafraîchissement
-window.addEventListener("beforeunload", () => {
-  if(role === "host"){
-    conns.forEach(c => c.close());
-  } else if(hostConn){
-    hostConn.close();
-  }
-});
 </script>
+</body>
+</html>
